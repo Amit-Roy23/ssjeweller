@@ -299,7 +299,7 @@ function GoldStockDialog({ open, onOpenChange, editing, suppliers, settings, pur
     const value = (form.grossWeight ?? 0) * (form.purchaseRate ?? 0)
     if (Math.abs((form.fineGoldWeight ?? 0) - fine) > 0.01) update({ fineGoldWeight: Math.round(fine * 100) / 100 })
     if (Math.abs((form.purchaseValue ?? 0) - value) > 1) update({ purchaseValue: Math.round(value) })
-  }, [form.grossWeight, form.purchaseRate, form.purity])
+  }, [form.grossWeight, form.purchaseRate, form.purity, form.fineGoldWeight, form.purchaseValue, purities])
 
   const selectSupplier = (id: string) => {
     if (id === 'none') { update({ supplierId: undefined, supplierName: undefined }); return }

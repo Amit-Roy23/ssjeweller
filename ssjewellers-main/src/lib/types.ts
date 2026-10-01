@@ -35,10 +35,13 @@ export interface Category {
 export type MetalType = 'GOLD' | 'SILVER' | 'DIAMOND' | 'PLATINUM' | 'OTHER'
 export type MaterialType = 'GOLD_BAR' | 'GOLD_COIN' | 'GOLD_SCRAP' | 'SILVER' | 'ALLOY' | 'STONE' | 'DIAMOND' | 'ACCESSORY' | 'OTHER'
 
+export type KaratType = '24K' | '22K' | '20K' | '18K' | '14K' | '925' | 'PT950' | 'NA'
+export const KARAT_OPTIONS: KaratType[] = ['24K', '22K', '20K', '18K', '14K', '925', 'PT950', 'NA']
+
 // ===== Work Statuses =====
 export type WorkStatusValue =
   | 'PENDING' | 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'ON_HOLD'
-  | 'COMPLETED' | 'REWORK_REQUIRED' | 'REJECTED' | 'CANCELLED' | 'QUALITY_CHECK' | 'APPROVED'
+  | 'COMPLETED' | 'REWORK_REQUIRED' | 'REJECTED' | 'CANCELLED' | 'QUALITY_CHECK' | 'APPROVED' | 'SKIPPED'
 
 export interface WorkStatus {
   id: string

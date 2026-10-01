@@ -1,0 +1,29 @@
+services:
+  # ----------------------------------------------------------------------------
+  # S.S Jewellery ERP Application Service (Hosted with Supabase PostgreSQL)
+  # ----------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ssjewellery_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - ssjewellery_network
+
+networks:
+  ssjewellery_network:
+    driver: bridge

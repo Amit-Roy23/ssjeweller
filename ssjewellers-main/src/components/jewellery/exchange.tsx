@@ -234,7 +234,7 @@ function ExchangeDialog({
     if (total !== form.totalValue) {
       setForm((f) => ({ ...f, totalValue: Math.round(total) }))
     }
-  }, [form.netWeight, form.ratePerGram])
+  }, [form.netWeight, form.ratePerGram, form.totalValue])
 
   // Auto-set rate based on karat & gold rate
   React.useEffect(() => {
@@ -259,12 +259,12 @@ function ExchangeDialog({
         }
       }
     }
-  }, [form.karat, form.touch, settings.defaultGoldRate24K, settings.defaultSilverRate])
+  }, [form.karat, form.touch, form.ratePerGram, settings.defaultGoldRate24K, settings.defaultSilverRate])
 
   // Auto-set touch based on karat
   const selectKarat = (k: KaratType) => {
     const touchMap: Record<KaratType, number> = {
-      '24K': 99.9, '22K': 91.6, '18K': 75, '14K': 58.5, '925': 92.5, 'PT950': 95, 'NA': 0,
+      '24K': 99.9, '22K': 91.6, '20K': 83.3, '18K': 75, '14K': 58.5, '925': 92.5, 'PT950': 95, 'NA': 0,
     }
     update({ karat: k, touch: touchMap[k] })
   }

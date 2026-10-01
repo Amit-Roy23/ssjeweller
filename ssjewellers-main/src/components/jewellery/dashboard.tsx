@@ -24,9 +24,13 @@ interface DashboardProps {
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { sales, purchases, goldStock, products, customers, workOrders, settings, currentUser, exchanges } = useJewelleryStore()
 
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-  const last7dStart = new Date(todayStart.getTime() - 6 * 86400000)
-  const last30dStart = new Date(todayStart.getTime() - 29 * 86400000)
+  const todayStart = React.useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [])
+  const last7dStart = React.useMemo(() => new Date(todayStart.getTime() - 6 * 86400000), [todayStart])
+  const last30dStart = React.useMemo(() => new Date(todayStart.getTime() - 29 * 86400000), [todayStart])
 
   const salesToday = sales.filter((s) => new Date(s.createdAt) >= todayStart)
   const purchasesToday = purchases.filter((p) => new Date(p.purchaseDate) >= todayStart)

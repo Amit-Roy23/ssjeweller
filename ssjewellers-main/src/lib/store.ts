@@ -111,6 +111,7 @@ interface JewelleryState {
   deletePurchase: (id: string) => void
 
   // customers
+  setCustomers: (customers: Customer[]) => void
   addCustomer: (c: Omit<Customer, 'id' | 'customerId' | 'createdAt' | 'totalPurchase' | 'totalPaid' | 'totalDue' | 'totalBills'>) => Customer
   updateCustomer: (id: string, patch: Partial<Customer>) => void
   deleteCustomer: (id: string) => void
@@ -440,6 +441,7 @@ export const useJewelleryStore = create<JewelleryState>()(
       updatePurchase: (id, patch) => set((s) => ({ purchases: s.purchases.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
       deletePurchase: (id) => set((s) => ({ purchases: s.purchases.filter((p) => p.id !== id) })),
 
+      setCustomers: (customers) => set({ customers }),
       addCustomer: (c) => {
         const seq = get().customers.length + 1
         const customerId = `CUST-${String(seq).padStart(3, '0')}`

@@ -29,7 +29,7 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
   const [error, setError] = React.useState('')
   const [loading, setLoading] = React.useState(false)
 
-  const submit = (e?: React.FormEvent) => {
+  const submit = async (e?: React.FormEvent) => {
     e?.preventDefault()
     setError('')
     if (!username.trim() || !password) {
@@ -37,16 +37,51 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      const user = login(username.trim(), password)
-      if (user) {
-        toast.success(`Welcome back, ${user.name.split(' ')[0]}!`)
+
+    try {
+      // Call server auth API endpoint
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success && data.user) {
+        // Sync user into store
+        login(username.trim(), password)
+        toast.success(`Welcome back, ${data.user.name.split(' ')[0]}!`)
+        onLoggedIn()
+        return
+      }
+
+      if (res.status === 401 || res.status === 403 || res.status === 429) {
+        setError(data.error || 'Invalid credentials or account deactivated')
+        setLoading(false)
+        return
+      }
+
+      // Fallback to client-side store if server DB is offline
+      const clientUser = login(username.trim(), password)
+      if (clientUser) {
+        toast.success(`Welcome back, ${clientUser.name.split(' ')[0]}!`)
+        onLoggedIn()
+      } else {
+        setError(data.error || 'Invalid credentials or account deactivated')
+      }
+    } catch {
+      // Fallback to client store if offline
+      const clientUser = login(username.trim(), password)
+      if (clientUser) {
+        toast.success(`Welcome back, ${clientUser.name.split(' ')[0]}!`)
         onLoggedIn()
       } else {
         setError('Invalid credentials or account deactivated')
-        setLoading(false)
       }
-    }, 400)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const quickLogin = (u: string, p: string) => {
@@ -54,12 +89,11 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
     setPassword(p)
     setError('')
     setTimeout(() => {
-      const user = login(u, p)
-      if (user) {
-        toast.success(`Welcome back, ${user.name.split(' ')[0]}!`)
-        onLoggedIn()
+      const form = document.querySelector('form')
+      if (form) {
+        form.requestSubmit()
       }
-    }, 200)
+    }, 50)
   }
 
   return (

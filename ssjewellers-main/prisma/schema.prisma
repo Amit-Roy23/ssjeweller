@@ -1,32 +1,897 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// S.S JEWELLERY ERP — Production PostgreSQL Schema
+// Generator & Datasource Definition
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum MetalType {
+  GOLD
+  SILVER
+  DIAMOND
+  PLATINUM
+  OTHER
+}
+
+enum MaterialType {
+  GOLD_BAR
+  GOLD_COIN
+  GOLD_SCRAP
+  SILVER
+  ALLOY
+  STONE
+  DIAMOND
+  ACCESSORY
+  OTHER
+}
+
+enum GoldStockStatus {
+  AVAILABLE
+  IN_PRODUCTION
+  USED
+  SOLD
+}
+
+enum StockItemType {
+  GOLD
+  STONE
+  PRODUCT
+}
+
+enum AdjustmentType {
+  INCREASE
+  DECREASE
+}
+
+enum AdjustmentReason {
+  WASTAGE
+  DAMAGE
+  MISSING
+  CORRECTION
+  PHYSICAL_ADJUSTMENT
+  INTERNAL_TRANSFER
+}
+
+enum PaymentMode {
+  CASH
+  CARD
+  UPI
+  BANK
+  CHEQUE
+  CREDIT
+}
+
+enum SaleStatus {
+  PAID
+  PARTIAL
+  DUE
+  CANCELLED
+  VOID
+}
+
+enum PaymentStatus {
+  COMPLETED
+  CANCELLED
+  REVERSED
+}
+
+enum PurchasePaymentStatus {
+  PAID
+  PARTIAL
+  DUE
+  CANCELLED
+}
+
+enum ExchangeType {
+  BUY
+  EXCHANGE
+}
+
+enum WorkPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WorkStatusValue {
+  PENDING
+  ASSIGNED
+  ACCEPTED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  REWORK_REQUIRED
+  REJECTED
+  CANCELLED
+  QUALITY_CHECK
+  APPROVED
+  SKIPPED
+}
+
+enum QCResult {
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  WORK_ASSIGNED
+  WORK_COMPLETED
+  WORK_OVERDUE
+  WORK_REJECTED
+  REWORK_REQUIRED
+  STOCK_LOW
+  PAYMENT_DUE
+  NEW_SALE
+  NEW_PURCHASE
+  WORK_REASSIGNED
+  WORK_DEADLINE
+}
+
+enum RecordStatus {
+  ACTIVE
+  CANCELLED
+  ARCHIVED
+}
+
+enum RestockingStatus {
+  PENDING
+  DONE
+}
+
+// ============================================================================
+// Core Masters: Users & Auth
+// ============================================================================
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String     @id @default(cuid())
+  username           String     @unique
+  name               String
+  phone              String
+  email              String?    @unique
+  role               UserRole   @default(STAFF)
+  passwordHash       String
+  active             Boolean    @default(true)
+  mustChangePassword Boolean    @default(false)
+  specialty          String?
+  lastLogin          DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil        DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  // Relations
+  salesBilled        Sale[]             @relation("BilledBySales")
+  salesCancelled     Sale[]             @relation("CancelledBySales")
+  paymentsReceived   Payment[]          @relation("ReceivedByPayments")
+  purchasesCreated   Purchase[]         @relation("PurchasesCreated")
+  assignedWorkOrders WorkOrder[]        @relation("AssignedWorkOrders")
+  assignedSteps      WorkOrderStep[]    @relation("AssignedWorkSteps")
+  workHistories      WorkHistory[]      @relation("UserWorkHistories")
+  wastageRecords     WastageRecord[]    @relation("UserWastages")
+  qualityChecks      QualityCheck[]     @relation("UserQualityChecks")
+  auditLogs          AuditLog[]         @relation("UserAuditLogs")
+  notifications      AppNotification[]  @relation("UserNotifications")
+  movementsPerformed StockMovement[]    @relation("MovementsPerformed")
+  adjustmentsPerformed StockAdjustment[] @relation("AdjustmentsPerformed")
+  defaultWorkflowSteps WorkflowStep[]   @relation("DefaultStepUser")
+
+  @@index([role, active])
+  @@index([phone])
 }
 
-model Post {
+// ============================================================================
+// Master Data: Purities & Categories
+// ============================================================================
+
+model Purity {
+  id         String    @id @default(cuid())
+  label      String    @unique
+  percentage Decimal   @db.Decimal(5, 2) // e.g. 91.60
+  metal      MetalType @default(GOLD)
+  active     Boolean   @default(true)
+  order      Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([metal, active])
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  active    Boolean   @default(true)
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  products  Product[]
+
+  @@index([active])
+}
+
+model WorkStatus {
+  id        String          @id @default(cuid())
+  value     WorkStatusValue @unique
+  label     String
+  color     String
+  active    Boolean         @default(true)
+  order     Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([active])
+}
+
+// ============================================================================
+// Partners: Customers & Suppliers
+// ============================================================================
+
+model Customer {
+  id                 String    @id @default(cuid())
+  customerId         String    @unique // e.g. CUST-001
+  name               String
+  phone              String
+  email              String?
+  address            String?
+  city               String?
+  pincode            String?
+  gstin              String?
+  pan                String?
+  dateOfBirth        DateTime?
+  anniversary        DateTime?
+  // Denormalized aggregates for sub-millisecond lookups (updated in transaction)
+  totalPurchasePaise BigInt    @default(0)
+  totalPaidPaise     BigInt    @default(0)
+  totalDuePaise      BigInt    @default(0)
+  totalBills         Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  sales              Sale[]
+  payments           Payment[]
+
+  @@index([phone])
+  @@index([name])
+  @@index([city])
+  @@index([totalDuePaise])
+}
+
+model Supplier {
+  id                 String      @id @default(cuid())
+  supplierCode       String      @unique // e.g. SUP-001
+  name               String
+  companyName        String?
+  phone              String
+  email              String?
+  address            String?
+  city               String?
+  pincode            String?
+  gstin              String?
+  pan                String?
+  openingBalancePaise BigInt     @default(0)
+  totalPurchasePaise BigInt      @default(0)
+  totalPaidPaise     BigInt      @default(0)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  // Relations
+  purchases          Purchase[]
+  goldStocks         GoldStock[]
+  stones             StoneItem[]
+
+  @@index([phone])
+  @@index([name])
+}
+
+// ============================================================================
+// Raw Materials: Gold & Stone Inventory
+// ============================================================================
+
+model GoldStock {
+  id                    String          @id @default(cuid())
+  stockId               String          @unique // e.g. GB-001
+  materialType          MaterialType    @default(GOLD_BAR)
+  metal                 MetalType       @default(GOLD)
+  purity                String          // e.g. "22K"
+  karat                 String          // e.g. "22K"
+  grossWeightMg         BigInt          // Integer Milligrams (100.000g = 100000mg)
+  fineGoldWeightMg      BigInt          // Integer Milligrams
+  supplierId            String?
+  supplier              Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  purchaseDate          DateTime
+  purchaseRatePaisePerGram BigInt       // Paise per gram (e.g. 7100.00 -> 710000 paise)
+  purchaseValuePaise    BigInt          // Total cost in Paise
+  currentLocation       String          @default("Vault A")
+  status                GoldStockStatus @default(AVAILABLE)
+  referenceNumber       String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([status, metal])
+  @@index([currentLocation])
+  @@index([supplierId])
+  @@index([purchaseDate])
+}
+
+model StoneItem {
+  id                String    @id @default(cuid())
+  stoneId           String    @unique // e.g. DM-001
+  type              String    // Diamond, Ruby, Emerald, etc.
+  shape             String    // Round, Oval, Princess, etc.
+  size              String    // 0.3ct / 4x6mm
+  quantity          Int       // Total pieces
+  weightCarats      Decimal   @db.Decimal(10, 3) // Carats with 3 decimals
+  unit              String    @default("carat")
+  purchaseCostPaise BigInt    // Total cost in Paise
+  supplierId        String?
+  supplier          Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  usedQuantity      Int       @default(0)
+  remainingQuantity Int       // quantity - usedQuantity
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([type, shape])
+  @@index([supplierId])
+  @@index([remainingQuantity])
+}
+
+// ============================================================================
+// Stock Movements & Adjustments Ledger (Append-Only)
+// ============================================================================
+
+model StockMovement {
+  id           String        @id @default(cuid())
+  itemType     StockItemType
+  itemId       String
+  itemName     String
+  fromLocation String
+  toLocation   String
+  fromUserId   String?
+  toUserId     String?
+  weightMg     BigInt?       // Milligrams
+  quantity     Int?          // Pieces
+  reason       String
+  reference    String?
+  remarks      String?
+  performedById String
+  performedBy  User          @relation("MovementsPerformed", fields: [performedById], references: [id], onDelete: Restrict)
+  timestamp    DateTime      @default(now())
+
+  @@index([itemId, itemType])
+  @@index([performedById])
+  @@index([timestamp])
+}
+
+model StockAdjustment {
+  id             String           @id @default(cuid())
+  itemType       StockItemType
+  itemId         String
+  itemName       String
+  adjustmentType AdjustmentType
+  weightMg       BigInt?          // Milligrams
+  quantity       Int?             // Pieces
+  reason         AdjustmentReason
+  remarks        String
+  performedById  String
+  performedBy    User             @relation("AdjustmentsPerformed", fields: [performedById], references: [id], onDelete: Restrict)
+  timestamp      DateTime         @default(now())
+
+  @@index([itemId, itemType])
+  @@index([performedById])
+  @@index([timestamp])
+}
+
+// ============================================================================
+// Finished Jewellery Catalog (Products)
+// ============================================================================
+
+model Product {
+  id               String    @id @default(cuid())
+  productCode      String    @unique // e.g. SJ-RING-001
+  barcode          String    @unique // e.g. 8901234500011
+  name             String
+  categoryId       String
+  category         Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategory      String?
+  designNumber     String?
+  metal            MetalType @default(GOLD)
+  purity           String    // e.g. "22K"
+  grossWeightMg    BigInt    // Milligrams
+  netWeightMg      BigInt    // Milligrams
+  stoneWeightMg    BigInt    @default(0) // Milligrams
+  wastageMg        BigInt    @default(0) // Milligrams
+  makingChargePaise BigInt   @default(0) // Paise
+  otherChargesPaise BigInt   @default(0) // Paise
+  gstRateBps       Int       @default(300) // Basis points (300 = 3.00%)
+  sellingPricePaise BigInt   // Paise
+  costPricePaise   BigInt    // Paise
+  stock            Int       @default(1)
+  hsnCode          String    @default("7113")
+  imageColor       String?   @default("from-amber-400 to-yellow-600")
+  version          Int       @default(1) // Optimistic locking
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  saleItems        SaleItem[]
+
+  @@index([categoryId])
+  @@index([metal, purity])
+  @@index([stock])
+  @@index([name])
+}
+
+// ============================================================================
+// Sales, Invoicing & Payments
+// ============================================================================
+
+model Sale {
+  id                  String       @id @default(cuid())
+  invoiceNo           String       @unique // e.g. INV-2026-00001 (Gap-free sequence)
+  customerId          String
+  customer            Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerName        String
+  customerPhone       String
+  customerAddress     String?
+  customerGstin       String?
+  subtotalPaise       BigInt
+  totalMakingPaise    BigInt       @default(0)
+  totalStonePaise     BigInt       @default(0)
+  totalOtherPaise     BigInt       @default(0)
+  totalDiscountPaise  BigInt       @default(0)
+  totalGstPaise       BigInt       @default(0)
+  grandTotalPaise     BigInt
+  paidAmountPaise     BigInt       @default(0)
+  dueAmountPaise      BigInt       @default(0)
+  paymentMode         PaymentMode  @default(CASH)
+  paymentRef          String?
+  status              SaleStatus   @default(PAID)
+  cancelReason        String?
+  cancelledAt         DateTime?
+  cancelledById       String?
+  cancelledBy         User?        @relation("CancelledBySales", fields: [cancelledById], references: [id], onDelete: SetNull)
+  oldGoldAdjustmentPaise BigInt    @default(0)
+  branch              String       @default("Main Branch")
+  billedById          String
+  billedBy            User         @relation("BilledBySales", fields: [billedById], references: [id], onDelete: Restrict)
+  idempotencyKey      String?      @unique
+  version             Int          @default(1) // Optimistic locking
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relations
+  items               SaleItem[]
+  payments            Payment[]
+  returns             SalesReturn[]
+  oldGoldExchanges    OldGoldExchange[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([billedById])
+  @@index([dueAmountPaise])
+}
+
+model SaleItem {
+  id                String     @id @default(cuid())
+  saleId            String
+  sale              Sale       @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId         String?
+  product           Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productCode       String?
+  name              String
+  hsn               String     @default("7113")
+  metal             MetalType  @default(GOLD)
+  purity            String
+  grossWeightMg     BigInt
+  netWeightMg       BigInt
+  stoneWeightMg     BigInt     @default(0)
+  ratePaisePerGram  BigInt     // Rate per gram in Paise
+  makingAmountPaise BigInt     @default(0)
+  stoneAmountPaise  BigInt     @default(0)
+  otherChargesPaise BigInt     @default(0)
+  subtotalPaise     BigInt
+  discountPaise     BigInt     @default(0)
+  gstRateBps        Int        @default(300) // 300 = 3%
+  gstAmountPaise    BigInt     @default(0)
+  totalPaise        BigInt
+  quantity          Int        @default(1)
+  createdAt         DateTime   @default(now())
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  paymentId     String        @unique // e.g. PAY-2026-00001
+  saleId        String?
+  sale          Sale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  invoiceNo     String?
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerName  String
+  amountPaise   BigInt
+  paymentMode   PaymentMode
+  transactionId String?
+  status        PaymentStatus @default(COMPLETED)
+  cancelReason  String?
+  receivedById  String
+  receivedBy    User          @relation("ReceivedByPayments", fields: [receivedById], references: [id], onDelete: Restrict)
+  remarks       String?
+  date          DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+
+  @@index([saleId])
+  @@index([customerId])
+  @@index([date])
+  @@index([status])
+}
+
+model SalesReturn {
+  id                 String           @id @default(cuid())
+  returnId           String           @unique // e.g. RET-2026-00001
+  originalInvoiceNo  String
+  saleId             String
+  sale               Sale             @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  customerName       String
+  productName        String
+  returnQuantity     Int              @default(1)
+  returnWeightMg     BigInt
+  reason             String
+  refundAmountPaise  BigInt           @default(0)
+  exchangeAmountPaise BigInt          @default(0)
+  restockingStatus   RestockingStatus @default(PENDING)
+  status             RecordStatus     @default(ACTIVE)
+  date               DateTime         @default(now())
+  createdAt          DateTime         @default(now())
+
+  @@index([saleId])
+  @@index([date])
+}
+
+// ============================================================================
+// Procurement & Purchases (Supplier Side)
+// ============================================================================
+
+model Purchase {
+  id             String                @id @default(cuid())
+  purchaseId     String                @unique // e.g. PUR-2026-00001
+  supplierId     String
+  supplier       Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierName   String
+  invoiceNumber  String
+  purchaseDate   DateTime
+  subtotalPaise  BigInt
+  totalTaxPaise  BigInt                @default(0)
+  grandTotalPaise BigInt
+  paidAmountPaise BigInt               @default(0)
+  paymentStatus  PurchasePaymentStatus @default(PAID)
+  status         RecordStatus          @default(ACTIVE)
+  cancelReason   String?
+  notes          String?
+  performedById  String
+  performedBy    User                  @relation("PurchasesCreated", fields: [performedById], references: [id], onDelete: Restrict)
+  version        Int                   @default(1)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  // Relations
+  items          PurchaseItem[]
+
+  @@index([supplierId])
+  @@index([purchaseDate])
+  @@index([paymentStatus])
+}
+
+model PurchaseItem {
+  id                String       @id @default(cuid())
+  purchaseId        String
+  purchase          Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  materialType      MaterialType @default(GOLD_BAR)
+  description       String
+  purity            String
+  grossWeightMg     BigInt
+  netWeightMg       BigInt
+  ratePaisePerGram  BigInt
+  makingChargesPaise BigInt      @default(0)
+  taxPaise          BigInt       @default(0)
+  totalPaise        BigInt
+  createdAt         DateTime     @default(now())
+
+  @@index([purchaseId])
+}
+
+// ============================================================================
+// Old Gold Exchange (Buyback & Trade-In)
+// ============================================================================
+
+model OldGoldExchange {
+  id                     String       @id @default(cuid())
+  voucherNo              String       @unique // e.g. EX-2026-00001
+  customerName           String
+  customerPhone          String
+  type                   ExchangeType @default(BUY)
+  itemDescription        String
+  grossWeightMg          BigInt
+  netWeightMg            BigInt
+  karat                  String
+  touchBps               Int          // e.g. 9160 = 91.60%
+  ratePaisePerGram       BigInt
+  totalValuePaise        BigInt
+  adjustedAgainstSaleId  String?
+  adjustedAgainstSale    Sale?        @relation(fields: [adjustedAgainstSaleId], references: [id], onDelete: SetNull)
+  adjustedAgainstInvoice String?
+  paidAmountPaise        BigInt       @default(0)
+  status                 RecordStatus @default(ACTIVE)
+  date                   DateTime     @default(now())
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@index([adjustedAgainstSaleId])
+  @@index([customerPhone])
+  @@index([date])
+}
+
+// ============================================================================
+// Workshop & Karigar Workflow (Production Engine)
+// ============================================================================
+
+model Workflow {
+  id          String         @id @default(cuid())
+  code        String         @unique // e.g. "wf-ring"
+  name        String
+  description String?
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  steps       WorkflowStep[]
+  workOrders  WorkOrder[]
+
+  @@index([active])
+}
+
+model WorkflowStep {
+  id             String    @id @default(cuid())
+  workflowId     String
+  workflow       Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  defaultUserId  String?
+  defaultUser    User?     @relation("DefaultStepUser", fields: [defaultUserId], references: [id], onDelete: SetNull)
+  estimatedHours Int?
+  order          Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([workflowId, order])
+}
+
+model WorkOrder {
+  id                 String          @id @default(cuid())
+  workId             String          @unique // e.g. WF-10025
+  productCode        String?
+  productName        String
+  customerName       String?
+  workflowId         String
+  workflow           Workflow        @relation(fields: [workflowId], references: [id], onDelete: Restrict)
+  workflowName       String
+  currentStepIndex   Int             @default(0)
+  grossWeightMg      BigInt          // Initial raw weight mg
+  netWeightMg        BigInt?         // Final finished weight mg
+  purity             String          // e.g. "22K"
+  metal              MetalType       @default(GOLD)
+  priority           WorkPriority    @default(NORMAL)
+  status             WorkStatusValue @default(PENDING)
+  assignedToId       String?
+  assignedTo         User?           @relation("AssignedWorkOrders", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToName     String?
+  startDate          DateTime        @default(now())
+  expectedCompletion DateTime
+  actualCompletion   DateTime?
+  notes              String?
+  version            Int             @default(1) // Optimistic locking
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  // Relations
+  steps              WorkOrderStep[]
+  history            WorkHistory[]
+  wastageRecords     WastageRecord[]
+  qualityChecks      QualityCheck[]
+
+  @@index([workflowId])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([expectedCompletion])
+  @@index([priority])
+}
+
+model WorkOrderStep {
+  id             String          @id @default(cuid())
+  workOrderId    String
+  workOrder      WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  stepId         String          // Reference template step ID
+  stepName       String
+  order          Int             @default(0)
+  assignedToId   String?
+  assignedTo     User?           @relation("AssignedWorkSteps", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToName String?
+  status         WorkStatusValue @default(PENDING)
+  inputWeightMg  BigInt?
+  outputWeightMg BigInt?
+  wastageMg      BigInt?
+  remarks        String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  dueDate        DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([workOrderId, order])
+  @@index([assignedToId, status])
+}
+
+model WorkHistory {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation("UserWorkHistories", fields: [userId], references: [id], onDelete: SetNull)
+  userName    String
+  action      String
+  details     String?
+  timestamp   DateTime  @default(now())
+
+  @@index([workOrderId, timestamp])
+}
+
+model WastageRecord {
+  id              String    @id @default(cuid())
+  workOrderId     String
+  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workId          String
+  stepName        String
+  userId          String
+  user            User      @relation("UserWastages", fields: [userId], references: [id], onDelete: Restrict)
+  userName        String
+  inputWeightMg   BigInt
+  outputWeightMg  BigInt
+  wastageWeightMg BigInt
+  wastageBps      Int       // Basis points: (wastage / input) * 10000
+  date            DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  @@index([workOrderId])
+  @@index([userId])
+  @@index([date])
+}
+
+model QualityCheck {
+  id               String    @id @default(cuid())
+  workOrderId      String
+  workOrder        WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workId           String
+  productName      String
+  weightChecked    Boolean   @default(false)
+  purityChecked    Boolean   @default(false)
+  designChecked    Boolean   @default(false)
+  stoneChecked     Boolean   @default(false)
+  finishingChecked Boolean   @default(false)
+  result           QCResult  @default(APPROVED)
+  remarks          String?
+  checkedById      String
+  checkedBy        User      @relation("UserQualityChecks", fields: [checkedById], references: [id], onDelete: Restrict)
+  date             DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  @@index([workOrderId])
+  @@index([checkedById])
+  @@index([result])
+}
+
+// ============================================================================
+// Compliance, Audit & Notifications
+// ============================================================================
+
+model AuditLog {
   id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  userId    String?
+  user      User?    @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+  userName  String
+  action    String
+  entity    String
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  details   String?
+  ipAddress String?
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+}
+
+model AppNotification {
+  id        String           @id @default(cuid())
+  type      NotificationType
   title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  message   String
+  forUserId String?
+  forUser   User?            @relation("UserNotifications", fields: [forUserId], references: [id], onDelete: Cascade)
+  read      Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  @@index([forUserId, read])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// Settings & Gap-Free Transaction Sequences
+// ============================================================================
+
+model ShopSetting {
+  id                 String   @id @default("default")
+  shopName           String   @default("S.S JEWELLERY")
+  ownerName          String   @default("Suresh Shah")
+  phone              String   @default("+91 98250 12345")
+  email              String   @default("contact@ssjewellery.in")
+  address            String   @default("Shop 12, Manek Chowk, Ring Road")
+  city               String   @default("Surat")
+  pincode            String   @default("395003")
+  gstin              String   @default("24ABCDE1234F1Z5")
+  pan                String   @default("ABCDE1234F")
+  defaultGstRateBps  Int      @default(300) // 3% = 300 bps
+  makingGstRateBps   Int      @default(500) // 5% = 500 bps (making charges)
+  defaultGoldRate24KPaise BigInt @default(725000) // ₹7,250/g = 725,000 paise
+  defaultSilverRatePaisePerKg BigInt @default(9450000) // ₹94,500/kg = 9,450,000 paise
+  branch             String   @default("Main Branch")
+  currency           String   @default("₹")
+  invoicePrefix      String   @default("INV-2026")
+  purchasePrefix     String   @default("PUR-2026")
+  workOrderPrefix    String   @default("WF")
+  customerPrefix     String   @default("CUST")
+  invoiceFooter      String   @default("Thank you for your business! Visit again.")
+  termsConditions    String   @default("1. Goods once sold will not be taken back.\n2. All disputes subject to Surat jurisdiction.\n3. Gold rate applicable as on date of bill.")
+  updatedAt          DateTime @updatedAt
+}
+
+/**
+ * Atomic Gap-Free Sequence Generator
+ * Locked via SELECT ... FOR UPDATE inside the transaction to guarantee gap-free numbering per FY
+ */
+model SequenceCounter {
+  id            String   @id @default(cuid())
+  entityType    String   // "INVOICE" | "PURCHASE" | "CUSTOMER" | "WORK_ORDER" | "PAYMENT" | "EXCHANGE" | "RETURN"
+  prefix        String   // "INV", "PUR", "CUST", etc.
+  financialYear String   // "2026" or "2026-27"
+  currentValue  Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([entityType, financialYear, prefix])
+  @@index([entityType, financialYear])
 }
