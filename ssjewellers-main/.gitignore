@@ -61,3 +61,4 @@ Thumbs.db
 *.sln
 *.sw?
 .vercel
+scripts/add-test-users.ts

@@ -14,13 +14,6 @@ interface LoginPageProps {
   onLoggedIn: () => void
 }
 
-const DEMO_ACCOUNTS = [
-  { username: 'admin', password: 'admin123', role: 'Admin', desc: 'Full access — all modules' },
-  { username: 'manager', password: 'manager123', role: 'Manager', desc: 'Dashboard, inventory, workflow, reports' },
-  { username: 'rahul', password: 'rahul123', role: 'Staff', desc: 'Gold Issue & Melting specialist' },
-  { username: 'amit', password: 'amit123', role: 'Staff', desc: 'Shaping specialist' },
-]
-
 export function LoginPage({ onLoggedIn }: LoginPageProps) {
   const login = useJewelleryStore((s) => s.login)
   const [username, setUsername] = React.useState('')
@@ -62,38 +55,12 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
         return
       }
 
-      // Fallback to client-side store if server DB is offline
-      const clientUser = login(username.trim(), password)
-      if (clientUser) {
-        toast.success(`Welcome back, ${clientUser.name.split(' ')[0]}!`)
-        onLoggedIn()
-      } else {
-        setError(data.error || 'Invalid credentials or account deactivated')
-      }
+      setError(data.error || 'Invalid credentials or account deactivated')
     } catch {
-      // Fallback to client store if offline
-      const clientUser = login(username.trim(), password)
-      if (clientUser) {
-        toast.success(`Welcome back, ${clientUser.name.split(' ')[0]}!`)
-        onLoggedIn()
-      } else {
-        setError('Invalid credentials or account deactivated')
-      }
+      setError('Connection error. Please try again.')
     } finally {
       setLoading(false)
     }
-  }
-
-  const quickLogin = (u: string, p: string) => {
-    setUsername(u)
-    setPassword(p)
-    setError('')
-    setTimeout(() => {
-      const form = document.querySelector('form')
-      if (form) {
-        form.requestSubmit()
-      }
-    }, 50)
   }
 
   return (
@@ -108,7 +75,7 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
         {/* Left: Brand panel */}
         <div className="hidden lg:flex flex-col gap-6 p-8">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-gold-gradient flex items-center justify-center">
+            <div className="h-12 w-12 rounded-xl bg-gold-gradient flex items-center justify-center shadow-md">
               <Gem className="h-6 w-6 text-white" />
             </div>
             <div>
@@ -199,22 +166,6 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
                 {loading ? 'Signing in…' : <>Sign In <ArrowRight className="h-4 w-4 ml-2" /></>}
               </Button>
             </form>
-
-            <div className="mt-6 pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground mb-2 text-center">Quick demo login — click to sign in</p>
-              <div className="grid grid-cols-2 gap-2">
-                {DEMO_ACCOUNTS.map((acc) => (
-                  <button
-                    key={acc.username}
-                    onClick={() => quickLogin(acc.username, acc.password)}
-                    className="flex flex-col items-start gap-0.5 p-2 rounded-lg border border-border hover:border-primary hover:bg-accent transition-colors text-left"
-                  >
-                    <span className="text-xs font-semibold">{acc.role}</span>
-                    <span className="text-[10px] text-muted-foreground line-clamp-1">{acc.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
