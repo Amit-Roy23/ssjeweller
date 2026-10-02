@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { PrismaClient, MetalType, WorkStatusValue } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
@@ -159,6 +160,74 @@ async function main() {
     },
   })
   console.log(`  ✓ Super admin user created (${adminUser.username})`)
+
+  // 7. Default Production Workflows
+  const defaultWorkflows = [
+    {
+      code: 'wf-ring-gold',
+      name: 'Gold Ring Production',
+      description: 'Standard 4-step production flow for plain and studded gold rings',
+      steps: [
+        { name: 'Gold Melting & Ingot Casting', estimatedHours: 2, order: 0 },
+        { name: 'Die Shaping & Band Sizing', estimatedHours: 4, order: 1 },
+        { name: 'Filing, Jointing & Soldering', estimatedHours: 3, order: 2 },
+        { name: 'Buffing & High Luster Polishing', estimatedHours: 2, order: 3 },
+      ],
+    },
+    {
+      code: 'wf-diamond-setting',
+      name: 'Diamond & Gemstone Jewellery',
+      description: 'Precision 5-step workflow with prong/pave stone setting & microscopic QC',
+      steps: [
+        { name: 'Mount Casting & Laser Trimming', estimatedHours: 3, order: 0 },
+        { name: 'Mount Pre-Polishing & Cleaning', estimatedHours: 2, order: 1 },
+        { name: 'Micro-Prong Diamond Setting', estimatedHours: 6, order: 2 },
+        { name: 'Rhodium Plating & Final Luster', estimatedHours: 3, order: 3 },
+        { name: 'Microscopic Quality & Purity Inspection', estimatedHours: 1, order: 4 },
+      ],
+    },
+    {
+      code: 'wf-bangle-kada',
+      name: 'Bangle & Kada Manufacturing',
+      description: '4-step heavy jewellery production for bangles, kadas, and bracelets',
+      steps: [
+        { name: 'Continuous Strip / Rod Casting', estimatedHours: 4, order: 0 },
+        { name: 'Mandrel Rolling & Lock Jointing', estimatedHours: 5, order: 1 },
+        { name: 'Hand Chasing & CNC Faceting', estimatedHours: 6, order: 2 },
+        { name: 'High Speed Rotary Buffing & Clean', estimatedHours: 3, order: 3 },
+      ],
+    },
+    {
+      code: 'wf-necklace-chain',
+      name: 'Necklace & Chain Assembly',
+      description: '5-step delicate chain linking and heavy necklace assembly flow',
+      steps: [
+        { name: 'Wire Drawing & Link Weaving', estimatedHours: 6, order: 0 },
+        { name: 'Clasp / S-Hook Joint Soldering', estimatedHours: 4, order: 1 },
+        { name: 'Centerpiece / Pearl Attachment', estimatedHours: 5, order: 2 },
+        { name: 'Ultrasonic Bath & Steam Cleaning', estimatedHours: 2, order: 3 },
+        { name: 'Hallmarking & Dimensional QC', estimatedHours: 1, order: 4 },
+      ],
+    },
+  ]
+
+  for (const wf of defaultWorkflows) {
+    const existing = await prisma.workflow.findUnique({ where: { code: wf.code } })
+    if (!existing) {
+      await prisma.workflow.create({
+        data: {
+          code: wf.code,
+          name: wf.name,
+          description: wf.description,
+          active: true,
+          steps: {
+            create: wf.steps,
+          },
+        },
+      })
+    }
+  }
+  console.log(`  ✓ ${defaultWorkflows.length} Production workflows seeded`)
 
   console.log('🎉 Production bootstrap seed complete!')
 }

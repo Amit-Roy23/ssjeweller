@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import {
   PrismaClient,
   UserRole,
@@ -754,6 +755,80 @@ async function main() {
     },
   })
   console.log('  ✓ Exchanges and Returns seeded')
+
+  // 16b. Production Workflows
+  const demoWorkflows = [
+    {
+      id: 'wf-ring',
+      code: 'wf-ring',
+      name: 'Gold Ring Production',
+      description: 'Standard 4-step production flow for plain and studded gold rings',
+      steps: [
+        { name: 'Gold Melting & Ingot Casting', defaultUserId: 'usr-rahul', estimatedHours: 2, order: 0 },
+        { name: 'Die Shaping & Band Sizing', defaultUserId: 'usr-amit', estimatedHours: 4, order: 1 },
+        { name: 'Filing, Jointing & Soldering', defaultUserId: 'usr-sumit', estimatedHours: 3, order: 2 },
+        { name: 'Buffing & High Luster Polishing', defaultUserId: 'usr-rakesh', estimatedHours: 2, order: 3 },
+      ],
+    },
+    {
+      id: 'wf-necklace',
+      code: 'wf-necklace',
+      name: 'Necklace Production',
+      description: '5-step delicate chain linking and heavy necklace assembly flow',
+      steps: [
+        { name: 'Wire Drawing & Link Weaving', defaultUserId: 'usr-rahul', estimatedHours: 6, order: 0 },
+        { name: 'Clasp / S-Hook Joint Soldering', defaultUserId: 'usr-amit', estimatedHours: 4, order: 1 },
+        { name: 'Centerpiece / Stone Attachment', defaultUserId: 'usr-ankit', estimatedHours: 5, order: 2 },
+        { name: 'Ultrasonic Bath & Steam Cleaning', defaultUserId: 'usr-rakesh', estimatedHours: 2, order: 3 },
+        { name: 'Hallmarking & Dimensional QC', defaultUserId: 'usr-admin', estimatedHours: 1, order: 4 },
+      ],
+    },
+    {
+      id: 'wf-bangle',
+      code: 'wf-bangle',
+      name: 'Bangle Production',
+      description: '4-step heavy jewellery production for bangles, kadas, and bracelets',
+      steps: [
+        { name: 'Continuous Strip / Rod Casting', defaultUserId: 'usr-rahul', estimatedHours: 4, order: 0 },
+        { name: 'Mandrel Rolling & Lock Jointing', defaultUserId: 'usr-amit', estimatedHours: 5, order: 1 },
+        { name: 'Hand Chasing & CNC Faceting', defaultUserId: 'usr-sumit', estimatedHours: 6, order: 2 },
+        { name: 'High Speed Rotary Buffing & Clean', defaultUserId: 'usr-rakesh', estimatedHours: 3, order: 3 },
+      ],
+    },
+    {
+      id: 'wf-diamond',
+      code: 'wf-diamond',
+      name: 'Diamond & Gemstone Setting',
+      description: 'Precision 5-step workflow with prong/pave stone setting & microscopic QC',
+      steps: [
+        { name: 'Mount Casting & Laser Trimming', defaultUserId: 'usr-rahul', estimatedHours: 3, order: 0 },
+        { name: 'Mount Pre-Polishing & Cleaning', defaultUserId: 'usr-amit', estimatedHours: 2, order: 1 },
+        { name: 'Micro-Prong Diamond Setting', defaultUserId: 'usr-ankit', estimatedHours: 6, order: 2 },
+        { name: 'Rhodium Plating & Final Luster', defaultUserId: 'usr-rakesh', estimatedHours: 3, order: 3 },
+        { name: 'Microscopic Quality & Purity Inspection', defaultUserId: 'usr-admin', estimatedHours: 1, order: 4 },
+      ],
+    },
+  ]
+
+  for (const wf of demoWorkflows) {
+    const { steps, ...wfData } = wf
+    await prisma.workflow.upsert({
+      where: { id: wfData.id },
+      update: { name: wfData.name, description: wfData.description, code: wfData.code, active: true },
+      create: { ...wfData, active: true },
+    })
+
+    await prisma.workflowStep.deleteMany({ where: { workflowId: wf.id } })
+    for (const step of steps) {
+      await prisma.workflowStep.create({
+        data: {
+          ...step,
+          workflowId: wf.id,
+        },
+      })
+    }
+  }
+  console.log(`  ✓ ${demoWorkflows.length} Workflow templates seeded`)
 
   // 17. Work Orders
   const workOrders = [
