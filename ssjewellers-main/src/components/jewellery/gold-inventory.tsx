@@ -83,10 +83,13 @@ export function GoldInventoryView() {
 
   const [search, setSearch] = React.useState('')
   const [statusFilter, setStatusFilter] = React.useState('ALL')
-  const [editing, setEditing] = React.useState<GoldStock | null>(null)
+  const [editingStockId, setEditingStockId] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
-  const [moveOpen, setMoveOpen] = React.useState<GoldStock | null>(null)
+  const [moveOpenStockId, setMoveOpenStockId] = React.useState<string | null>(null)
+
+  const editing = editingStockId ? goldStock.find((g) => g.id === editingStockId) || null : null
+  const moveOpen = moveOpenStockId ? goldStock.find((g) => g.id === moveOpenStockId) || null : null
 
   const isSaving = addGoldMutation.isPending || updateGoldMutation.isPending
   const isDeleting = deleteGoldMutation.isPending
@@ -111,8 +114,8 @@ export function GoldInventoryView() {
     }
   }, [goldStock])
 
-  const openAdd = () => { setEditing(null); setDialogOpen(true) }
-  const openEdit = (g: GoldStock) => { setEditing(g); setDialogOpen(true) }
+  const openAdd = () => { setEditingStockId(null); setDialogOpen(true) }
+  const openEdit = (g: GoldStock) => { setEditingStockId(g.id); setDialogOpen(true) }
 
   const handleSave = async (data: Partial<GoldStock>) => {
     try {
@@ -133,15 +136,15 @@ export function GoldInventoryView() {
         referenceNumber: data.referenceNumber || null,
       }
 
-      if (editing) {
-        await updateGoldMutation.mutateAsync({ id: editing.id, data: payload })
+      if (editingStockId) {
+        await updateGoldMutation.mutateAsync({ id: editingStockId, data: payload })
         toast.success('Gold stock updated successfully')
       } else {
         await addGoldMutation.mutateAsync(payload)
         toast.success('Gold stock added successfully')
       }
       setDialogOpen(false)
-      setEditing(null)
+      setEditingStockId(null)
     } catch (err: any) {
       toast.error(err.message || 'Error saving gold stock')
     }
@@ -174,7 +177,7 @@ export function GoldInventoryView() {
         data: { currentLocation: to },
       })
       toast.success('Movement recorded successfully')
-      setMoveOpen(null)
+      setMoveOpenStockId(null)
     } catch (err: any) {
       toast.error(err.message || 'Failed to record movement')
     }
@@ -267,7 +270,7 @@ export function GoldInventoryView() {
                         </p>
                       </div>
                       <div className="flex flex-col gap-1 shrink-0">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setMoveOpen(g)}><ArrowRightLeft className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setMoveOpenStockId(g.id)}><ArrowRightLeft className="h-3.5 w-3.5" /></Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(g)}><Edit3 className="h-3.5 w-3.5" /></Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(g.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>
@@ -364,7 +367,7 @@ export function GoldInventoryView() {
       {moveOpen && (
         <MovementDialog
           stock={moveOpen}
-          onClose={() => setMoveOpen(null)}
+          onClose={() => setMoveOpenStockId(null)}
           onSave={handleMovement}
         />
       )}

@@ -4,7 +4,7 @@ import { MaterialType, MetalType, GoldStockStatus } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requirePermission } from '@/lib/auth/guards'
 import { InventoryService } from '@/lib/services/inventory.service'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, RequestTimer } from '@/lib/api-helpers'
 
 const createGoldStockSchema = z.object({
   stockId: z.string().min(1, 'Stock ID is required'),
@@ -25,6 +25,7 @@ const createGoldStockSchema = z.object({
 
 // GET /api/inventory/gold - List raw gold & bullion lots
 export async function GET(request: NextRequest) {
+  const timer = new RequestTimer()
   try {
     await requirePermission('inventory:read')
     const { searchParams } = new URL(request.url)
@@ -32,24 +33,57 @@ export async function GET(request: NextRequest) {
     const metal = searchParams.get('metal') as MetalType | null
     const status = searchParams.get('status') as GoldStockStatus | null
     const location = searchParams.get('location')
+    const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = searchParams.get('limit') ? Math.min(parseInt(searchParams.get('limit')!, 10), 100) : undefined
+    const skip = limit ? (page - 1) * limit : undefined
 
     const where = {
       ...(metal ? { metal } : {}),
       ...(status ? { status } : {}),
       ...(location ? { currentLocation: location } : {}),
+      ...(search
+        ? {
+            OR: [
+              { stockId: { contains: search, mode: 'insensitive' as const } },
+              { purity: { contains: search, mode: 'insensitive' as const } },
+              { currentLocation: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
     }
 
-    const goldStocks = await db.goldStock.findMany({
-      where,
-      include: {
-        supplier: { select: { id: true, name: true, supplierCode: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [goldStocks, totalCount] = await timer.track(() =>
+      Promise.all([
+        db.goldStock.findMany({
+          where,
+          include: {
+            supplier: { select: { id: true, name: true, supplierCode: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          ...(limit ? { take: limit, skip } : {}),
+        }),
+        db.goldStock.count({ where }),
+      ])
+    )
 
-    return jsonResponse({ goldStocks })
+    timer.log('GET', '/api/inventory/gold', 200)
+    return jsonResponse(
+      {
+        goldStocks,
+        pagination: {
+          totalCount,
+          page,
+          limit: limit || totalCount,
+          totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        },
+      },
+      undefined,
+      timer
+    )
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Failed to fetch gold inventory', 500)
+    timer.log('GET', '/api/inventory/gold', 500)
+    return errorResponse((err as Error).message || 'Failed to fetch gold inventory', 500, undefined, timer)
   }
 }
 

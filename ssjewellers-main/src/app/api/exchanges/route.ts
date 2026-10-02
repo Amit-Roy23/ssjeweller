@@ -4,7 +4,7 @@ import { ExchangeType } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requirePermission } from '@/lib/auth/guards'
 import { ExchangeService } from '@/lib/services/exchange.service'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, RequestTimer } from '@/lib/api-helpers'
 
 const createExchangeSchema = z.object({
   customerName: z.string().min(1, 'Customer name is required'),
@@ -24,12 +24,16 @@ const createExchangeSchema = z.object({
 
 // GET /api/exchanges - List old gold exchanges
 export async function GET(request: NextRequest) {
+  const timer = new RequestTimer()
   try {
     await requirePermission('exchanges:read')
     const { searchParams } = new URL(request.url)
 
     const type = searchParams.get('type') as ExchangeType | null
     const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = searchParams.get('limit') ? Math.min(parseInt(searchParams.get('limit')!, 10), 100) : undefined
+    const skip = limit ? (page - 1) * limit : undefined
 
     const where = {
       ...(type ? { type } : {}),
@@ -44,14 +48,34 @@ export async function GET(request: NextRequest) {
         : {}),
     }
 
-    const exchanges = await db.oldGoldExchange.findMany({
-      where,
-      orderBy: { date: 'desc' },
-    })
+    const [exchanges, totalCount] = await timer.track(() =>
+      Promise.all([
+        db.oldGoldExchange.findMany({
+          where,
+          orderBy: { date: 'desc' },
+          ...(limit ? { take: limit, skip } : {}),
+        }),
+        db.oldGoldExchange.count({ where }),
+      ])
+    )
 
-    return jsonResponse({ exchanges })
+    timer.log('GET', '/api/exchanges', 200)
+    return jsonResponse(
+      {
+        exchanges,
+        pagination: {
+          totalCount,
+          page,
+          limit: limit || totalCount,
+          totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        },
+      },
+      undefined,
+      timer
+    )
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Failed to fetch exchanges', 500)
+    timer.log('GET', '/api/exchanges', 500)
+    return errorResponse((err as Error).message || 'Failed to fetch exchanges', 500, undefined, timer)
   }
 }
 

@@ -74,7 +74,7 @@ export function WorkflowView() {
   const [userFilter, setUserFilter] = React.useState<string>('ALL')
   const [page, setPage] = React.useState(1)
   const [newOpen, setNewOpen] = React.useState(false)
-  const [viewOrder, setViewOrder] = React.useState<WorkOrder | null>(null)
+  const [viewOrderId, setViewOrderId] = React.useState<string | null>(null)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
 
   const rawUsers = (usersData?.users || []) as any[]
@@ -140,6 +140,8 @@ export function WorkflowView() {
     createdAt: w.createdAt,
     updatedAt: w.updatedAt,
   }))
+
+  const viewOrder = workOrders.find((w) => w.id === viewOrderId) || null
 
   const filtered = React.useMemo(() => {
     let list = workOrders
@@ -298,7 +300,7 @@ export function WorkflowView() {
                           </div>
                         </div>
                         <div className="flex flex-col gap-1 shrink-0">
-                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setViewOrder(w)}><Eye className="h-3.5 w-3.5 mr-1" /> Details</Button>
+                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setViewOrderId(w.id)}><Eye className="h-3.5 w-3.5 mr-1" /> Details</Button>
                           {isAdmin && (
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(w.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                           )}
@@ -357,9 +359,10 @@ export function WorkflowView() {
 
       <WorkOrderDetail
         order={viewOrder}
-        onClose={() => setViewOrder(null)}
+        onClose={() => setViewOrderId(null)}
         isAdmin={isAdmin}
         currentUser={currentUser}
+        isSaving={updateStepMutation.isPending || recordWastageMutation.isPending}
         onStepUpdate={async (orderId, stepData) => {
           try {
             await updateStepMutation.mutateAsync({ orderId, data: stepData })
@@ -680,11 +683,12 @@ function NewWorkOrderDialog({ open, onOpenChange, workflows, users, isSaving, on
   )
 }
 
-function WorkOrderDetail({ order, onClose, isAdmin, currentUser, onStepUpdate, onRecordWastage }: {
+function WorkOrderDetail({ order, onClose, isAdmin, currentUser, isSaving, onStepUpdate, onRecordWastage }: {
   order: WorkOrder | null
   onClose: () => void
   isAdmin: boolean
   currentUser: any
+  isSaving: boolean
   onStepUpdate: (orderId: string, data: any) => Promise<void>
   onRecordWastage: (data: any) => Promise<void>
 }) {
@@ -803,6 +807,7 @@ function WorkOrderDetail({ order, onClose, isAdmin, currentUser, onStepUpdate, o
                     isCompleted={isCompleted}
                     canAct={canAct && isCurrent}
                     grossWeight={order.grossWeight}
+                    isSaving={isSaving}
                     onStart={() => startStep(idx)}
                     onComplete={(out, remarks) => advanceStep(idx, out, remarks)}
                   />
@@ -831,13 +836,14 @@ function WorkOrderDetail({ order, onClose, isAdmin, currentUser, onStepUpdate, o
   )
 }
 
-function StepCard({ step, index, isCurrent, isCompleted, canAct, grossWeight, onStart, onComplete }: {
+function StepCard({ step, index, isCurrent, isCompleted, canAct, grossWeight, isSaving, onStart, onComplete }: {
   step: WorkOrder['steps'][0]
   index: number
   isCurrent: boolean
   isCompleted: boolean
   canAct: boolean
   grossWeight: number
+  isSaving: boolean
   onStart: () => void
   onComplete: (outputWeight?: number, remarks?: string) => void
 }) {
@@ -873,13 +879,15 @@ function StepCard({ step, index, isCurrent, isCompleted, canAct, grossWeight, on
           {step.remarks && <p className="text-[11px] text-muted-foreground mt-1 italic">&ldquo;{step.remarks}&rdquo;</p>}
 
           {canAct && step.status === 'ASSIGNED' && (
-            <Button size="sm" className="mt-2 h-7 text-xs" onClick={onStart}>
-              <Hammer className="h-3 w-3 mr-1" /> Start Work
+            <Button size="sm" className="mt-2 h-7 text-xs" onClick={onStart} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Hammer className="h-3 w-3 mr-1" />}
+              Start Work
             </Button>
           )}
           {canAct && step.status === 'IN_PROGRESS' && !showComplete && (
-            <Button size="sm" className="mt-2 h-7 text-xs" onClick={() => setShowComplete(true)}>
-              <CheckCircle2 className="h-3 w-3 mr-1" /> Complete Step
+            <Button size="sm" className="mt-2 h-7 text-xs" onClick={() => setShowComplete(true)} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+              Complete Step
             </Button>
           )}
           {canAct && step.status === 'IN_PROGRESS' && showComplete && (
@@ -891,8 +899,11 @@ function StepCard({ step, index, isCurrent, isCompleted, canAct, grossWeight, on
               </div>
               <Input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Remarks (optional)" className="h-8 text-xs" />
               <div className="flex gap-1">
-                <Button size="sm" className="h-7 text-xs flex-1" onClick={() => onComplete(outputWeight, remarks)}>Confirm Complete</Button>
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowComplete(false)}>Cancel</Button>
+                <Button size="sm" className="h-7 text-xs flex-1" onClick={() => onComplete(outputWeight, remarks)} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Confirm Complete
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowComplete(false)} disabled={isSaving}>Cancel</Button>
               </div>
             </div>
           )}

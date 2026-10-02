@@ -78,9 +78,11 @@ export function PurchaseView() {
   const [tab, setTab] = React.useState<'purchases' | 'suppliers'>('purchases')
   const [search, setSearch] = React.useState('')
   const [newOpen, setNewOpen] = React.useState(false)
-  const [viewP, setViewP] = React.useState<Purchase | null>(null)
+  const [viewPurchaseId, setViewPurchaseId] = React.useState<string | null>(null)
   const [cancelId, setCancelId] = React.useState<string | null>(null)
   const [cancelReason, setCancelReason] = React.useState('Order cancelled')
+
+  const viewP = viewPurchaseId ? purchases.find((p) => p.id === viewPurchaseId) || null : null
 
   const isCancelling = cancelPurchaseMutation.isPending
 
@@ -188,7 +190,7 @@ export function PurchaseView() {
                         <p className="text-base font-bold">{formatCurrency(p.grandTotal, currency)}</p>
                         {p.paymentStatus !== 'PAID' && <p className="text-[10px] text-rose-600 dark:text-rose-400">Due: {formatCurrency(p.grandTotal - p.paidAmount, currency)}</p>}
                         <div className="flex justify-end gap-1 mt-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewP(p)}><Eye className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewPurchaseId(p.id)}><Eye className="h-3.5 w-3.5" /></Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setCancelId(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                       </div>
@@ -215,7 +217,7 @@ export function PurchaseView() {
       />
 
       {/* View purchase */}
-      <Dialog open={!!viewP} onOpenChange={(o) => !o && setViewP(null)}>
+      <Dialog open={!!viewPurchaseId} onOpenChange={(o) => !o && setViewPurchaseId(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {viewP && (
             <>
@@ -298,9 +300,11 @@ function SuppliersTab() {
   }))
 
   const [search, setSearch] = React.useState('')
-  const [editing, setEditing] = React.useState<Supplier | null>(null)
+  const [editingSupplierId, setEditingSupplierId] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
+
+  const editing = editingSupplierId ? suppliers.find((s) => s.id === editingSupplierId) || null : null
 
   const isSaving = createSupplierMutation.isPending || updateSupplierMutation.isPending
   const isDeleting = deleteSupplierMutation.isPending
@@ -312,15 +316,15 @@ function SuppliersTab() {
 
   const handleSave = async (data: Partial<Supplier>) => {
     try {
-      if (editing) {
-        await updateSupplierMutation.mutateAsync({ id: editing.id, data })
+      if (editingSupplierId) {
+        await updateSupplierMutation.mutateAsync({ id: editingSupplierId, data })
         toast.success('Supplier updated successfully')
       } else {
         await createSupplierMutation.mutateAsync(data)
         toast.success('Supplier added successfully')
       }
       setDialogOpen(false)
-      setEditing(null)
+      setEditingSupplierId(null)
     } catch (err: any) {
       toast.error(err.message || 'Error saving supplier')
     }
@@ -343,7 +347,7 @@ function SuppliersTab() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input placeholder="Search suppliers…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add Supplier</Button>
+        <Button onClick={() => { setEditingSupplierId(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add Supplier</Button>
       </div>
 
       {loading ? (
@@ -367,7 +371,7 @@ function SuppliersTab() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(s); setDialogOpen(true) }}><Eye className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingSupplierId(s.id); setDialogOpen(true) }}><Eye className="h-3.5 w-3.5" /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 </div>

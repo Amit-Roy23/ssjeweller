@@ -50,24 +50,26 @@ export function SuppliersView() {
   }))
 
   const [search, setSearch] = React.useState('')
-  const [editing, setEditing] = React.useState<Supplier | null>(null)
+  const [editingId, setEditingId] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
+
+  const editing = editingId ? suppliers.find((s) => s.id === editingId) || null : null
 
   const isSaving = createSupplierMutation.isPending || updateSupplierMutation.isPending
   const isDeleting = deleteSupplierMutation.isPending
 
   const handleSave = async (data: Partial<Supplier>) => {
     try {
-      if (editing) {
-        await updateSupplierMutation.mutateAsync({ id: editing.id, data })
+      if (editingId) {
+        await updateSupplierMutation.mutateAsync({ id: editingId, data })
         toast.success('Supplier updated successfully')
       } else {
         await createSupplierMutation.mutateAsync(data)
         toast.success('Supplier created successfully')
       }
       setDialogOpen(false)
-      setEditing(null)
+      setEditingId(null)
     } catch (err: any) {
       toast.error(err.message || 'Error saving supplier')
     }
@@ -99,7 +101,7 @@ export function SuppliersView() {
           <Button variant="outline" size="icon" onClick={() => loadSuppliers()} disabled={loading} title="Refresh">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button onClick={() => { setEditing(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add Supplier</Button>
+          <Button onClick={() => { setEditingId(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add Supplier</Button>
         </div>
       </div>
 
@@ -131,7 +133,7 @@ export function SuppliersView() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(s); setDialogOpen(true) }}><Edit3 className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingId(s.id); setDialogOpen(true) }}><Edit3 className="h-3.5 w-3.5" /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 </div>

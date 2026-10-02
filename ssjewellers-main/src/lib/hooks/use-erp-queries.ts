@@ -74,6 +74,7 @@ export function useCreateSale() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
     },
   })
 }
@@ -87,6 +88,7 @@ export function useCancelSale() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
     },
   })
 }
@@ -100,6 +102,7 @@ export function useRecordPayment() {
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
     },
   })
 }
@@ -119,12 +122,13 @@ export function useCreateSalesReturn() {
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
       queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
     },
   })
 }
 
 // ===== Inventory Hooks =====
-export function useGoldStock(params?: { status?: string; metal?: string }) {
+export function useGoldStock(params?: { status?: string; metal?: string; search?: string; page?: number; limit?: number }) {
   return useQuery({
     queryKey: queryKeys.goldStock(params),
     queryFn: () => apiClient.inventory.getGold(params),
@@ -136,8 +140,10 @@ export function useAddGoldStock() {
   return useMutation({
     mutationFn: apiClient.inventory.addGold,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'gold'] })
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'summary'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
     },
   })
 }
@@ -148,8 +154,9 @@ export function useUpdateGoldStock() {
     mutationFn: ({ id, data }: { id: string; data: unknown }) =>
       apiClient.inventory.updateGold(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'gold'] })
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'summary'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }
@@ -159,8 +166,8 @@ export function useDeleteGoldStock() {
   return useMutation({
     mutationFn: (id: string) => apiClient.inventory.deleteGold(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'gold'] })
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'summary'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
     },
   })
 }
@@ -170,17 +177,17 @@ export function useIssueGold() {
   return useMutation({
     mutationFn: apiClient.inventory.issueGold,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'gold'] })
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'movements'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
       queryClient.invalidateQueries({ queryKey: ['workshop'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
     },
   })
 }
 
-export function useStones() {
+export function useStones(params?: { search?: string; page?: number; limit?: number }) {
   return useQuery({
-    queryKey: queryKeys.stones(),
-    queryFn: apiClient.inventory.getStones,
+    queryKey: ['inventory', 'stones', params],
+    queryFn: () => apiClient.inventory.getStones(params),
   })
 }
 
@@ -189,7 +196,8 @@ export function useAddStone() {
   return useMutation({
     mutationFn: apiClient.inventory.addStone,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'stones'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
     },
   })
 }
@@ -200,7 +208,8 @@ export function useUpdateStone() {
     mutationFn: ({ id, data }: { id: string; data: unknown }) =>
       apiClient.inventory.updateStone(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'stones'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
     },
   })
 }
@@ -210,7 +219,7 @@ export function useDeleteStone() {
   return useMutation({
     mutationFn: (id: string) => apiClient.inventory.deleteStone(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'stones'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
   })
 }
@@ -220,13 +229,13 @@ export function useIssueStones() {
   return useMutation({
     mutationFn: apiClient.inventory.issueStones,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'stones'] })
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'movements'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
     },
   })
 }
 
-export function useProducts(params?: { search?: string; categoryId?: string; inStock?: boolean }) {
+export function useProducts(params?: { search?: string; categoryId?: string; inStock?: boolean; page?: number; limit?: number }) {
   return useQuery({
     queryKey: queryKeys.products(params),
     queryFn: () => apiClient.inventory.getProducts(params),
@@ -238,8 +247,9 @@ export function useAddProduct() {
   return useMutation({
     mutationFn: apiClient.inventory.addProduct,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'products'] })
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'summary'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }
@@ -250,7 +260,8 @@ export function useUpdateProduct() {
     mutationFn: ({ id, data }: { id: string; data: unknown }) =>
       apiClient.inventory.updateProduct(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'products'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
     },
   })
 }
@@ -260,7 +271,8 @@ export function useDeleteProduct() {
   return useMutation({
     mutationFn: (id: string) => apiClient.inventory.deleteProduct(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', 'products'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
     },
   })
 }
@@ -291,7 +303,7 @@ export function useAdjustStock() {
 }
 
 // ===== Workshop Hooks =====
-export function useWorkOrders(params?: { status?: string; priority?: string; search?: string }) {
+export function useWorkOrders(params?: { status?: string; priority?: string; search?: string; page?: number; limit?: number }) {
   return useQuery({
     queryKey: queryKeys.workOrders(params),
     queryFn: () => apiClient.workshop.getOrders(params),
@@ -311,8 +323,9 @@ export function useCreateWorkOrder() {
   return useMutation({
     mutationFn: apiClient.workshop.createOrder,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshop', 'orders'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
     },
   })
 }
@@ -323,7 +336,8 @@ export function useUpdateWorkOrder() {
     mutationFn: ({ id, data }: { id: string; data: unknown }) =>
       apiClient.workshop.updateOrder(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshop', 'orders'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
   })
 }
@@ -333,7 +347,8 @@ export function useDeleteWorkOrder() {
   return useMutation({
     mutationFn: (id: string) => apiClient.workshop.deleteOrder(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshop', 'orders'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
   })
 }
@@ -341,10 +356,64 @@ export function useDeleteWorkOrder() {
 export function useUpdateWorkStep() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ orderId, data }: { orderId: string; data: unknown }) =>
+    mutationFn: ({ orderId, data }: { orderId: string; data: any }) =>
       apiClient.workshop.updateStep(orderId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshop', 'orders'] })
+    onMutate: async ({ orderId, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['workshop', 'orders'] })
+
+      const previousOrders = queryClient.getQueryData(['workshop', 'orders'])
+      const previousDetail = queryClient.getQueryData(queryKeys.workOrder(orderId))
+
+      // Optimistic update in list cache
+      queryClient.setQueriesData({ queryKey: ['workshop', 'orders'] }, (old: any) => {
+        if (!old || !old.workOrders) return old
+        return {
+          ...old,
+          workOrders: old.workOrders.map((wo: any) => {
+            if (wo.id !== orderId) return wo
+            const newSteps = (wo.steps || []).map((s: any, idx: number) => {
+              if (idx !== data.stepIndex) return s
+              return {
+                ...s,
+                status: data.status,
+                outputWeightMg: data.outputWeightMg ?? s.outputWeightMg,
+                remarks: data.remarks ?? s.remarks,
+              }
+            })
+            return {
+              ...wo,
+              steps: newSteps,
+              status: data.status === 'COMPLETED' ? (data.stepIndex + 1 >= newSteps.length ? 'COMPLETED' : 'IN_PROGRESS') : wo.status,
+            }
+          }),
+        }
+      })
+
+      return { previousOrders, previousDetail, orderId }
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previousOrders) {
+        queryClient.setQueryData(['workshop', 'orders'], context.previousOrders)
+      }
+      if (context?.previousDetail && context?.orderId) {
+        queryClient.setQueryData(queryKeys.workOrder(context.orderId), context.previousDetail)
+      }
+    },
+    onSuccess: (res, { orderId }) => {
+      if (res?.workOrder) {
+        queryClient.setQueryData(queryKeys.workOrder(orderId), { workOrder: res.workOrder })
+        queryClient.setQueriesData({ queryKey: ['workshop', 'orders'] }, (old: any) => {
+          if (!old || !old.workOrders) return old
+          return {
+            ...old,
+            workOrders: old.workOrders.map((wo: any) => (wo.id === orderId ? res.workOrder : wo)),
+          }
+        })
+      }
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
     },
   })
 }
@@ -354,7 +423,8 @@ export function useRecordQC() {
   return useMutation({
     mutationFn: apiClient.workshop.recordQC,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshop', 'orders'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
   })
 }
@@ -371,7 +441,8 @@ export function useRecordWastage() {
   return useMutation({
     mutationFn: apiClient.workshop.recordWastage,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workshop', 'wastages'] })
+      queryClient.invalidateQueries({ queryKey: ['workshop'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
   })
 }
@@ -415,7 +486,7 @@ export function useDeleteWorkflow() {
 }
 
 // ===== Customers & Suppliers =====
-export function useCustomers(params?: { search?: string; withDues?: boolean }) {
+export function useCustomers(params?: { search?: string; withDues?: boolean; page?: number; limit?: number }) {
   return useQuery({
     queryKey: queryKeys.customers(params),
     queryFn: () => apiClient.customers.list(params),
@@ -436,6 +507,8 @@ export function useCreateCustomer() {
     mutationFn: apiClient.customers.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] })
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }
@@ -447,6 +520,7 @@ export function useUpdateCustomer() {
       apiClient.customers.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] })
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
     },
   })
 }
@@ -461,10 +535,10 @@ export function useDeleteCustomer() {
   })
 }
 
-export function useSuppliers() {
+export function useSuppliers(params?: { search?: string; page?: number; limit?: number }) {
   return useQuery({
-    queryKey: queryKeys.suppliers(),
-    queryFn: apiClient.suppliers.list,
+    queryKey: ['suppliers', params],
+    queryFn: () => apiClient.suppliers.list(params),
   })
 }
 
@@ -474,6 +548,8 @@ export function useCreateSupplier() {
     mutationFn: apiClient.suppliers.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
   })
 }
@@ -485,6 +561,7 @@ export function useUpdateSupplier() {
       apiClient.suppliers.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
     },
   })
 }
@@ -508,10 +585,10 @@ export function useSupplierStatement(id: string) {
 }
 
 // ===== Purchases =====
-export function usePurchases() {
+export function usePurchases(params?: { search?: string; supplierId?: string; paymentStatus?: string; page?: number; limit?: number }) {
   return useQuery({
-    queryKey: queryKeys.purchases(),
-    queryFn: apiClient.purchases.list,
+    queryKey: ['purchases', params],
+    queryFn: () => apiClient.purchases.list(params),
   })
 }
 
@@ -535,16 +612,18 @@ export function useCancelPurchase() {
       apiClient.purchases.cancel(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] })
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }
 
 // ===== Exchanges =====
-export function useExchanges() {
+export function useExchanges(params?: { search?: string; type?: string; page?: number; limit?: number }) {
   return useQuery({
-    queryKey: queryKeys.exchanges(),
-    queryFn: apiClient.exchanges.list,
+    queryKey: ['exchanges', params],
+    queryFn: () => apiClient.exchanges.list(params),
   })
 }
 
@@ -554,7 +633,9 @@ export function useCreateExchange() {
     mutationFn: apiClient.exchanges.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exchanges'] })
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }
@@ -595,7 +676,24 @@ export function useMarkNotificationRead() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => apiClient.notifications.markRead(id),
-    onSuccess: () => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] })
+      const previous = queryClient.getQueryData(['notifications'])
+      queryClient.setQueryData(['notifications'], (old: any) => {
+        if (!old || !old.notifications) return old
+        return {
+          ...old,
+          notifications: old.notifications.map((n: any) => (n.id === id ? { ...n, read: true } : n)),
+        }
+      })
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['notifications'], context.previous)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })
@@ -605,7 +703,24 @@ export function useMarkAllNotificationsRead() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: apiClient.notifications.markAllRead,
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] })
+      const previous = queryClient.getQueryData(['notifications'])
+      queryClient.setQueryData(['notifications'], (old: any) => {
+        if (!old || !old.notifications) return old
+        return {
+          ...old,
+          notifications: old.notifications.map((n: any) => ({ ...n, read: true })),
+        }
+      })
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['notifications'], context.previous)
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
   })

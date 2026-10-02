@@ -43,10 +43,10 @@ export function SalesView() {
   const [statusFilter, setStatusFilter] = React.useState('ALL')
   const [page, setPage] = React.useState(1)
   const [newOpen, setNewOpen] = React.useState(false)
-  const [viewSale, setViewSale] = React.useState<Sale | null>(null)
+  const [viewSaleId, setViewSaleId] = React.useState<string | null>(null)
   const [cancelId, setCancelId] = React.useState<string | null>(null)
   const [cancelReason, setCancelReason] = React.useState('Customer returned/cancelled order')
-  const [payOpen, setPayOpen] = React.useState<Sale | null>(null)
+  const [paySaleId, setPaySaleId] = React.useState<string | null>(null)
 
   const { data: salesData, isLoading: loadingSales } = useSales({
     search: search || undefined,
@@ -153,6 +153,9 @@ export function SalesView() {
     createdAt: s.createdAt,
   }))
 
+  const viewSale = viewSaleId ? sales.find((s) => s.id === viewSaleId) || null : null
+  const paySale = paySaleId ? sales.find((s) => s.id === paySaleId) || null : null
+
   const allPayments = (salesData?.sales || []).flatMap((s: any) =>
     (s.payments || []).map((p: any) => ({
       id: p.id,
@@ -228,19 +231,19 @@ export function SalesView() {
   }
 
   const handleRecordPayment = async (amount: number, mode: PaymentMode, ref: string) => {
-    if (!payOpen) return
+    if (!paySale) return
     try {
       await recordPaymentMutation.mutateAsync({
-        saleId: payOpen.id,
+        saleId: paySale.id,
         data: {
           amountPaise: Math.round(amount * 100),
           paymentMode: mode,
           reference: ref || null,
-          notes: `Payment for bill ${payOpen.invoiceNo}`,
+          notes: `Payment for bill ${paySale.invoiceNo}`,
         },
       })
       toast.success('Payment recorded successfully')
-      setPayOpen(null)
+      setPaySaleId(null)
     } catch (err: any) {
       toast.error(err.message || 'Error recording payment')
     }
@@ -313,9 +316,9 @@ export function SalesView() {
                         {s.dueAmount > 0 && <p className="text-[10px] text-rose-600 dark:text-rose-400">Due: {formatCurrency(s.dueAmount, currency)}</p>}
                         <div className="flex justify-end gap-1 mt-1">
                           {s.dueAmount > 0 && s.status !== 'CANCELLED' && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setPayOpen(s)}>Payment</Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setPaySaleId(s.id)}>Payment</Button>
                           )}
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewSale(s)}><Eye className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewSaleId(s.id)}><Eye className="h-3.5 w-3.5" /></Button>
                           {s.status !== 'CANCELLED' && (
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setCancelId(s.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                           )}
@@ -385,12 +388,12 @@ export function SalesView() {
         onSave={handleCreateSale}
       />
 
-      <ViewBillDialog sale={viewSale} onClose={() => setViewSale(null)} currency={currency} />
+      <ViewBillDialog sale={viewSale} onClose={() => setViewSaleId(null)} currency={currency} />
 
-      {payOpen && (
+      {paySale && (
         <PaymentDialog
-          sale={payOpen}
-          onClose={() => setPayOpen(null)}
+          sale={paySale}
+          onClose={() => setPaySaleId(null)}
           currency={currency}
           isSaving={recordPaymentMutation.isPending}
           onSave={handleRecordPayment}

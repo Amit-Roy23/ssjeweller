@@ -4,7 +4,7 @@ import { MetalType, WorkPriority, WorkStatusValue } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requirePermission } from '@/lib/auth/guards'
 import { WorkshopService } from '@/lib/services/workshop.service'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, RequestTimer } from '@/lib/api-helpers'
 
 const createWorkOrderSchema = z.object({
   productCode: z.string().optional().nullable(),
@@ -22,6 +22,7 @@ const createWorkOrderSchema = z.object({
 
 // GET /api/workshop/orders - List work orders
 export async function GET(request: NextRequest) {
+  const timer = new RequestTimer()
   try {
     await requirePermission('workshop:read')
     const { searchParams } = new URL(request.url)
@@ -30,6 +31,9 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority') as WorkPriority | null
     const assignedToId = searchParams.get('assignedToId')
     const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = searchParams.get('limit') ? Math.min(parseInt(searchParams.get('limit')!, 10), 100) : undefined
+    const skip = limit ? (page - 1) * limit : undefined
 
     const where = {
       ...(status ? { status } : {}),
@@ -46,18 +50,42 @@ export async function GET(request: NextRequest) {
         : {}),
     }
 
-    const workOrders = await db.workOrder.findMany({
-      where,
-      include: {
-        steps: { orderBy: { order: 'asc' } },
-        assignedTo: { select: { id: true, name: true, username: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [workOrders, totalCount] = await timer.track(() =>
+      Promise.all([
+        db.workOrder.findMany({
+          where,
+          include: {
+            steps: { orderBy: { order: 'asc' } },
+            history: { orderBy: { timestamp: 'desc' } },
+            qualityChecks: true,
+            wastageRecords: true,
+            workflow: { select: { id: true, name: true } },
+            assignedTo: { select: { id: true, name: true, username: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          ...(limit ? { take: limit, skip } : {}),
+        }),
+        db.workOrder.count({ where }),
+      ])
+    )
 
-    return jsonResponse({ workOrders })
+    timer.log('GET', '/api/workshop/orders', 200)
+    return jsonResponse(
+      {
+        workOrders,
+        pagination: {
+          totalCount,
+          page,
+          limit: limit || totalCount,
+          totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        },
+      },
+      undefined,
+      timer
+    )
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Failed to fetch work orders', 500)
+    timer.log('GET', '/api/workshop/orders', 500)
+    return errorResponse((err as Error).message || 'Failed to fetch work orders', 500, undefined, timer)
   }
 }
 

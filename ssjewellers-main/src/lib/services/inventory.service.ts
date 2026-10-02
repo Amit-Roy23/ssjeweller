@@ -422,34 +422,40 @@ export const InventoryService = {
   },
 
   /**
-   * Computes comprehensive live stock valuation and weight metrics.
+   * Computes comprehensive live stock valuation and weight metrics using native DB aggregations.
    */
   async getInventorySummary() {
-    const [goldStocks, stones, products] = await Promise.all([
-      db.goldStock.findMany(),
-      db.stoneItem.findMany(),
-      db.product.findMany(),
+    const [availableGoldAgg, inProductionGoldAgg, availableSilverAgg, productsData, stonesAgg] = await Promise.all([
+      db.goldStock.aggregate({
+        where: { status: GoldStockStatus.AVAILABLE, metal: MetalType.GOLD },
+        _sum: { grossWeightMg: true },
+      }),
+      db.goldStock.aggregate({
+        where: { status: GoldStockStatus.IN_PRODUCTION, metal: MetalType.GOLD },
+        _sum: { grossWeightMg: true },
+      }),
+      db.goldStock.aggregate({
+        where: { status: GoldStockStatus.AVAILABLE, metal: MetalType.SILVER },
+        _sum: { grossWeightMg: true },
+      }),
+      db.product.findMany({
+        where: { stock: { gt: 0 } },
+        select: { stock: true, sellingPricePaise: true },
+      }),
+      db.stoneItem.aggregate({
+        _sum: { remainingQuantity: true },
+      }),
     ])
 
-    const totalAvailableGoldMg = goldStocks
-      .filter((g) => g.status === GoldStockStatus.AVAILABLE && g.metal === MetalType.GOLD)
-      .reduce((acc, g) => acc + g.grossWeightMg, 0n)
-
-    const totalInProductionGoldMg = goldStocks
-      .filter((g) => g.status === GoldStockStatus.IN_PRODUCTION && g.metal === MetalType.GOLD)
-      .reduce((acc, g) => acc + g.grossWeightMg, 0n)
-
-    const totalSilverMg = goldStocks
-      .filter((g) => g.status === GoldStockStatus.AVAILABLE && g.metal === MetalType.SILVER)
-      .reduce((acc, g) => acc + g.grossWeightMg, 0n)
-
-    const totalProductsCount = products.reduce((acc, p) => acc + p.stock, 0)
-    const totalFinishedStockValuationPaise = products.reduce(
+    const totalAvailableGoldMg = availableGoldAgg._sum.grossWeightMg ?? 0n
+    const totalInProductionGoldMg = inProductionGoldAgg._sum.grossWeightMg ?? 0n
+    const totalSilverMg = availableSilverAgg._sum.grossWeightMg ?? 0n
+    const totalProductsCount = productsData.reduce((acc, p) => acc + p.stock, 0)
+    const totalFinishedStockValuationPaise = productsData.reduce(
       (acc, p) => acc + p.sellingPricePaise * BigInt(p.stock),
       0n
     )
-
-    const totalRemainingStones = stones.reduce((acc, s) => acc + s.remainingQuantity, 0)
+    const totalRemainingStones = stonesAgg._sum.remainingQuantity ?? 0
 
     return {
       totalAvailableGoldMg,

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requirePermission } from '@/lib/auth/guards'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, RequestTimer } from '@/lib/api-helpers'
 
 const createSupplierSchema = z.object({
   supplierCode: z.string().min(1, 'Supplier code is required'),
@@ -19,17 +19,56 @@ const createSupplierSchema = z.object({
 })
 
 // GET /api/suppliers - List suppliers
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const timer = new RequestTimer()
   try {
     await requirePermission('suppliers:read')
+    const { searchParams } = new URL(request.url)
 
-    const suppliers = await db.supplier.findMany({
-      orderBy: { createdAt: 'desc' },
-    })
+    const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = searchParams.get('limit') ? Math.min(parseInt(searchParams.get('limit')!, 10), 100) : undefined
+    const skip = limit ? (page - 1) * limit : undefined
 
-    return jsonResponse({ suppliers })
+    const where = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' as const } },
+            { phone: { contains: search } },
+            { supplierCode: { contains: search, mode: 'insensitive' as const } },
+            { gstin: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}
+
+    const [suppliers, totalCount] = await timer.track(() =>
+      Promise.all([
+        db.supplier.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          ...(limit ? { take: limit, skip } : {}),
+        }),
+        db.supplier.count({ where }),
+      ])
+    )
+
+    timer.log('GET', '/api/suppliers', 200)
+    return jsonResponse(
+      {
+        suppliers,
+        pagination: {
+          totalCount,
+          page,
+          limit: limit || totalCount,
+          totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        },
+      },
+      undefined,
+      timer
+    )
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Failed to fetch suppliers', 500)
+    timer.log('GET', '/api/suppliers', 500)
+    return errorResponse((err as Error).message || 'Failed to fetch suppliers', 500, undefined, timer)
   }
 }
 

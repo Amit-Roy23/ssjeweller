@@ -221,7 +221,7 @@ export const WorkshopService = {
         nextStatus = WorkStatusValue.COMPLETED
       }
 
-      // Update work order
+      // Update work order and return with full refreshed steps and relations
       const updatedWorkOrder = await tx.workOrder.update({
         where: { id: workOrder.id },
         data: {
@@ -229,6 +229,14 @@ export const WorkshopService = {
           status: nextStatus,
           netWeightMg: outputWeightMg ?? workOrder.netWeightMg,
           version: { increment: 1 },
+        },
+        include: {
+          steps: { orderBy: { order: 'asc' } },
+          history: { orderBy: { timestamp: 'desc' } },
+          qualityChecks: true,
+          wastageRecords: true,
+          workflow: { select: { id: true, name: true } },
+          assignedTo: { select: { id: true, name: true } },
         },
       })
 

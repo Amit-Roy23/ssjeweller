@@ -4,7 +4,7 @@ import { MetalType } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requirePermission } from '@/lib/auth/guards'
 import { InventoryService } from '@/lib/services/inventory.service'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, RequestTimer } from '@/lib/api-helpers'
 
 const createProductSchema = z.object({
   productCode: z.string().min(1, 'Product code is required'),
@@ -31,6 +31,7 @@ const createProductSchema = z.object({
 
 // GET /api/inventory/products - List products
 export async function GET(request: NextRequest) {
+  const timer = new RequestTimer()
   try {
     await requirePermission('inventory:read')
     const { searchParams } = new URL(request.url)
@@ -39,6 +40,9 @@ export async function GET(request: NextRequest) {
     const metal = searchParams.get('metal') as MetalType | null
     const inStockOnly = searchParams.get('inStock') === 'true'
     const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = searchParams.get('limit') ? Math.min(parseInt(searchParams.get('limit')!, 10), 100) : undefined
+    const skip = limit ? (page - 1) * limit : undefined
 
     const where = {
       ...(categoryId ? { categoryId } : {}),
@@ -55,17 +59,37 @@ export async function GET(request: NextRequest) {
         : {}),
     }
 
-    const products = await db.product.findMany({
-      where,
-      include: {
-        category: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [products, totalCount] = await timer.track(() =>
+      Promise.all([
+        db.product.findMany({
+          where,
+          include: {
+            category: { select: { id: true, name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          ...(limit ? { take: limit, skip } : {}),
+        }),
+        db.product.count({ where }),
+      ])
+    )
 
-    return jsonResponse({ products })
+    timer.log('GET', '/api/inventory/products', 200)
+    return jsonResponse(
+      {
+        products,
+        pagination: {
+          totalCount,
+          page,
+          limit: limit || totalCount,
+          totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        },
+      },
+      undefined,
+      timer
+    )
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Failed to fetch products', 500)
+    timer.log('GET', '/api/inventory/products', 500)
+    return errorResponse((err as Error).message || 'Failed to fetch products', 500, undefined, timer)
   }
 }
 

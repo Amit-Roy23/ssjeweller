@@ -61,9 +61,11 @@ export function UsersView() {
 
   const workOrders = (workOrdersData?.workOrders || []) as any[]
 
-  const [editing, setEditing] = React.useState<UserType | null>(null)
+  const [editingUserId, setEditingUserId] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
+
+  const editing = editingUserId ? users.find((u) => u.id === editingUserId) || null : null
 
   const isSaving = createUserMutation.isPending || updateUserMutation.isPending
   const isDeleting = deactivateUserMutation.isPending
@@ -102,9 +104,9 @@ export function UsersView() {
 
   const handleSave = async (data: any) => {
     try {
-      if (editing) {
+      if (editingUserId) {
         await updateUserMutation.mutateAsync({
-          id: editing.id,
+          id: editingUserId,
           data: {
             name: data.name,
             phone: data.phone,
@@ -128,7 +130,7 @@ export function UsersView() {
         toast.success(`User @${data.username} created successfully`)
       }
       setDialogOpen(false)
-      setEditing(null)
+      setEditingUserId(null)
     } catch (err: any) {
       toast.error(err.message || 'Error saving user')
     }
@@ -141,7 +143,7 @@ export function UsersView() {
           <h2 className="text-xl font-bold flex items-center gap-2"><UserCog className="h-5 w-5 text-primary" /> User Management</h2>
           <p className="text-sm text-muted-foreground mt-0.5">{stats.active} active users · {stats.admins} admins · {stats.staff} staff</p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add User</Button>
+        <Button onClick={() => { setEditingUserId(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add User</Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -173,7 +175,7 @@ export function UsersView() {
                           <p className="text-[11px] text-muted-foreground">@{u.username}</p>
                         </div>
                         <div className="flex gap-0.5 shrink-0">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(u); setDialogOpen(true) }}><Edit3 className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingUserId(u.id); setDialogOpen(true) }}><Edit3 className="h-3.5 w-3.5" /></Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleActive(u)} title={u.active ? 'Deactivate' : 'Activate'}>
                             <Power className={`h-3.5 w-3.5 ${u.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`} />
                           </Button>

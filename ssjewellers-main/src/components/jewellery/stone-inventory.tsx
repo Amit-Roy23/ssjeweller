@@ -62,9 +62,11 @@ export function StoneInventoryView() {
   }))
 
   const [search, setSearch] = React.useState('')
-  const [editing, setEditing] = React.useState<StoneItem | null>(null)
+  const [editingStoneId, setEditingStoneId] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
+
+  const editing = editingStoneId ? stones.find((s) => s.id === editingStoneId) || null : null
 
   const isSaving = addStoneMutation.isPending || updateStoneMutation.isPending
   const isDeleting = deleteStoneMutation.isPending
@@ -95,15 +97,15 @@ export function StoneInventoryView() {
         supplierId: data.supplierId || null,
       }
 
-      if (editing) {
-        await updateStoneMutation.mutateAsync({ id: editing.id, data: payload })
+      if (editingStoneId) {
+        await updateStoneMutation.mutateAsync({ id: editingStoneId, data: payload })
         toast.success('Stone updated successfully')
       } else {
         await addStoneMutation.mutateAsync(payload)
         toast.success('Stone added successfully')
       }
       setDialogOpen(false)
-      setEditing(null)
+      setEditingStoneId(null)
     } catch (err: any) {
       toast.error(err.message || 'Error saving stone')
     }
@@ -126,7 +128,7 @@ export function StoneInventoryView() {
           <h2 className="text-xl font-bold flex items-center gap-2"><Gem className="h-5 w-5 text-primary" /> Stone &amp; Diamond Inventory</h2>
           <p className="text-sm text-muted-foreground mt-0.5">{stones.length} stone types · {stats.totalCarats} carats total</p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add Stone</Button>
+        <Button onClick={() => { setEditingStoneId(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add Stone</Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -175,7 +177,7 @@ export function StoneInventoryView() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(s); setDialogOpen(true) }}><Edit3 className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingStoneId(s.id); setDialogOpen(true) }}><Edit3 className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(s.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </div>

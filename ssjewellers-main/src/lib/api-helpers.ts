@@ -44,11 +44,63 @@ export function serializeBigInt<T>(obj: T): T {
 }
 
 /**
- * Standardized API Response Helper with automatic BigInt serialization.
+ * High-precision server timing tracker for API profiling and telemetry.
  */
-export function jsonResponse<T>(data: T, init?: ResponseInit): NextResponse {
+export class RequestTimer {
+  private startTime = performance.now()
+  private dbTime = 0
+  private queries = 0
+
+  recordDb(durationMs: number) {
+    this.dbTime += durationMs
+    this.queries++
+  }
+
+  async track<R>(fn: () => Promise<R>): Promise<R> {
+    const start = performance.now()
+    try {
+      return await fn()
+    } finally {
+      this.recordDb(performance.now() - start)
+    }
+  }
+
+  getHeaders(): HeadersInit {
+    const total = Math.round(performance.now() - this.startTime)
+    const db = Math.round(this.dbTime)
+    return {
+      'Server-Timing': `total;dur=${total}, db;dur=${db}`,
+      'X-Response-Time': `${total}ms`,
+      'X-Prisma-Queries': `${this.queries}`,
+    }
+  }
+
+  log(method: string, path: string, status = 200) {
+    const total = Math.round(performance.now() - this.startTime)
+    const db = Math.round(this.dbTime)
+    console.log(`[API_TIMING] ${method} ${path} ${status} - ${total}ms (db: ${db}ms, queries: ${this.queries})`)
+  }
+}
+
+/**
+ * Standardized API Response Helper with automatic BigInt serialization and server timing.
+ */
+export function jsonResponse<T>(data: T, init?: ResponseInit, timer?: RequestTimer): NextResponse {
   const sanitized = serializeBigInt(data)
-  return NextResponse.json(sanitized, init)
+  const timingHeaders = timer ? timer.getHeaders() : {}
+  const headers = new Headers(init?.headers)
+
+  if (timer) {
+    const entries = timer.getHeaders() as Record<string, string>
+    for (const [k, v] of Object.entries(entries)) {
+      headers.set(k, v)
+    }
+  }
+
+  return NextResponse.json(sanitized, {
+    ...init,
+    headers,
+  })
 }
 
 /**
@@ -57,28 +109,46 @@ export function jsonResponse<T>(data: T, init?: ResponseInit): NextResponse {
 export function errorResponse(
   message: string,
   statusCode = 400,
-  details?: unknown
+  details?: unknown,
+  timer?: RequestTimer
 ): NextResponse {
+  const headers = new Headers()
+  if (timer) {
+    const entries = timer.getHeaders() as Record<string, string>
+    for (const [k, v] of Object.entries(entries)) {
+      headers.set(k, v)
+    }
+  }
+
   return NextResponse.json(
     {
       error: message,
       ...(details ? { details } : {}),
     },
-    { status: statusCode }
+    { status: statusCode, headers }
   )
 }
 
 /**
  * Universal API Error Handler that preserves AuthError/ApiError status codes.
  */
-export function handleApiError(err: unknown, defaultStatus = 500): NextResponse {
+export function handleApiError(err: unknown, defaultStatus = 500, timer?: RequestTimer): NextResponse {
   const status = (err as any)?.statusCode || (err as any)?.status || defaultStatus
   const message = (err as Error)?.message || 'Internal Server Error'
+  const headers = new Headers()
+  if (timer) {
+    const entries = timer.getHeaders() as Record<string, string>
+    for (const [k, v] of Object.entries(entries)) {
+      headers.set(k, v)
+    }
+  }
+
   return NextResponse.json(
     {
       error: message,
       code: status === 401 ? 'UNAUTHORIZED' : status === 403 ? 'FORBIDDEN' : status === 404 ? 'NOT_FOUND' : 'ERROR',
     },
-    { status }
+    { status, headers }
   )
 }
+

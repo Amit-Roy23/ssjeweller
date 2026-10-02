@@ -85,7 +85,13 @@ export const apiClient = {
       apiClient.delete<{ success: boolean; message: string }>(`/api/inventory/gold/${id}`),
     issueGold: (data: { goldStockId: string; workId: string }) =>
       apiClient.post<{ success: boolean; goldStock: any }>('/api/inventory/gold/issue', data),
-    getStones: () => apiClient.get<{ stones: any[] }>('/api/inventory/stones'),
+    getStones: (params?: { search?: string; page?: number; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.search) q.set('search', params.search)
+      if (params?.page) q.set('page', String(params.page))
+      if (params?.limit) q.set('limit', String(params.limit))
+      return apiClient.get<{ stones: any[]; pagination?: any }>(`/api/inventory/stones?${q.toString()}`)
+    },
     addStone: (data: unknown) => apiClient.post<{ success: boolean; stone: any }>('/api/inventory/stones', data),
     updateStone: (id: string, data: unknown) =>
       apiClient.patch<{ success: boolean; stone: any }>(`/api/inventory/stones/${id}`, data),
@@ -93,12 +99,14 @@ export const apiClient = {
       apiClient.delete<{ success: boolean; message: string }>(`/api/inventory/stones/${id}`),
     issueStones: (data: { stoneItemId: string; quantity: number; workId: string }) =>
       apiClient.post<{ success: boolean; stoneItem: any }>('/api/inventory/stones/issue', data),
-    getProducts: (params?: { search?: string; categoryId?: string; inStock?: boolean }) => {
+    getProducts: (params?: { search?: string; categoryId?: string; inStock?: boolean; page?: number; limit?: number }) => {
       const q = new URLSearchParams()
       if (params?.search) q.set('search', params.search)
       if (params?.categoryId) q.set('categoryId', params.categoryId)
       if (params?.inStock) q.set('inStock', 'true')
-      return apiClient.get<{ products: any[] }>(`/api/inventory/products?${q.toString()}`)
+      if (params?.page) q.set('page', String(params.page))
+      if (params?.limit) q.set('limit', String(params.limit))
+      return apiClient.get<{ products: any[]; pagination?: any }>(`/api/inventory/products?${q.toString()}`)
     },
     addProduct: (data: unknown) =>
       apiClient.post<{ success: boolean; product: any }>('/api/inventory/products', data),
@@ -119,12 +127,14 @@ export const apiClient = {
 
   // Workshop
   workshop: {
-    getOrders: (params?: { status?: string; priority?: string; search?: string }) => {
+    getOrders: (params?: { status?: string; priority?: string; search?: string; page?: number; limit?: number }) => {
       const q = new URLSearchParams()
       if (params?.status) q.set('status', params.status)
       if (params?.priority) q.set('priority', params.priority)
       if (params?.search) q.set('search', params.search)
-      return apiClient.get<{ workOrders: any[] }>(`/api/workshop/orders?${q.toString()}`)
+      if (params?.page) q.set('page', String(params.page))
+      if (params?.limit) q.set('limit', String(params.limit))
+      return apiClient.get<{ workOrders: any[]; pagination?: any }>(`/api/workshop/orders?${q.toString()}`)
     },
     getOrder: (id: string) => apiClient.get<{ workOrder: any }>(`/api/workshop/orders/${id}`),
     createOrder: (data: unknown) =>
@@ -151,7 +161,13 @@ export const apiClient = {
 
   // Suppliers & Purchases
   suppliers: {
-    list: () => apiClient.get<{ suppliers: any[] }>('/api/suppliers'),
+    list: (params?: { search?: string; page?: number; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.search) q.set('search', params.search)
+      if (params?.page) q.set('page', String(params.page))
+      if (params?.limit) q.set('limit', String(params.limit))
+      return apiClient.get<{ suppliers: any[]; pagination?: any }>(`/api/suppliers?${q.toString()}`)
+    },
     create: (data: unknown) => apiClient.post<{ success: boolean; supplier: any }>('/api/suppliers', data),
     update: (id: string, data: unknown) =>
       apiClient.patch<{ success: boolean; supplier: any }>(`/api/suppliers/${id}`, data),
@@ -160,7 +176,15 @@ export const apiClient = {
     getStatement: (id: string) => apiClient.get<{ statement: any }>(`/api/suppliers/${id}/statement`),
   },
   purchases: {
-    list: () => apiClient.get<{ purchases: any[] }>('/api/procurement/purchases'),
+    list: (params?: { search?: string; supplierId?: string; paymentStatus?: string; page?: number; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.search) q.set('search', params.search)
+      if (params?.supplierId) q.set('supplierId', params.supplierId)
+      if (params?.paymentStatus) q.set('paymentStatus', params.paymentStatus)
+      if (params?.page) q.set('page', String(params.page))
+      if (params?.limit) q.set('limit', String(params.limit))
+      return apiClient.get<{ purchases: any[]; pagination?: any }>(`/api/procurement/purchases?${q.toString()}`)
+    },
     create: (data: unknown) =>
       apiClient.post<{ success: boolean; purchase: any }>('/api/procurement/purchases', data),
     cancel: (id: string, reason: string) =>
@@ -171,7 +195,14 @@ export const apiClient = {
 
   // Exchanges
   exchanges: {
-    list: () => apiClient.get<{ exchanges: any[] }>('/api/exchanges'),
+    list: (params?: { search?: string; type?: string; page?: number; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.search) q.set('search', params.search)
+      if (params?.type) q.set('type', params.type)
+      if (params?.page) q.set('page', String(params.page))
+      if (params?.limit) q.set('limit', String(params.limit))
+      return apiClient.get<{ exchanges: any[]; pagination?: any }>(`/api/exchanges?${q.toString()}`)
+    },
     create: (data: unknown) => apiClient.post<{ success: boolean; exchange: any }>('/api/exchanges', data),
   },
 

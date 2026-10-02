@@ -55,25 +55,28 @@ export function CustomersView() {
   }))
 
   const [search, setSearch] = React.useState('')
-  const [editing, setEditing] = React.useState<Customer | null>(null)
+  const [editingId, setEditingId] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
-  const [viewC, setViewC] = React.useState<Customer | null>(null)
+  const [viewCustomerId, setViewCustomerId] = React.useState<string | null>(null)
+
+  const editing = editingId ? customers.find((c) => c.id === editingId) || null : null
+  const viewC = viewCustomerId ? customers.find((c) => c.id === viewCustomerId) || null : null
 
   const isSaving = createCustomerMutation.isPending || updateCustomerMutation.isPending
   const isDeleting = deleteCustomerMutation.isPending
 
   const handleSave = async (data: Partial<Customer>) => {
     try {
-      if (editing) {
-        await updateCustomerMutation.mutateAsync({ id: editing.id, data })
+      if (editingId) {
+        await updateCustomerMutation.mutateAsync({ id: editingId, data })
         toast.success('Customer updated successfully')
       } else {
         const res = await createCustomerMutation.mutateAsync(data)
         toast.success(`Customer ${res.customer?.name} created successfully`)
       }
       setDialogOpen(false)
-      setEditing(null)
+      setEditingId(null)
     } catch (err: any) {
       toast.error(err.message || 'Error saving customer')
     }
@@ -111,7 +114,7 @@ export function CustomersView() {
           <Button variant="outline" size="icon" onClick={() => loadCustomers()} disabled={loading} title="Refresh from database">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button onClick={() => { setEditing(null); setDialogOpen(true) }}>
+          <Button onClick={() => { setEditingId(null); setDialogOpen(true) }}>
             <Plus className="h-4 w-4 mr-1.5" /> Add Customer
           </Button>
         </div>
@@ -155,7 +158,7 @@ export function CustomersView() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((c) => (
-            <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setViewC(c)}>
+            <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setViewCustomerId(c.id)}>
               <CardContent className="p-3">
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0">
@@ -168,8 +171,8 @@ export function CustomersView() {
                         <p className="text-[11px] text-muted-foreground">{c.customerId}</p>
                       </div>
                       <div className="flex gap-0.5 shrink-0">
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setViewC(c) }}><Eye className="h-3 w-3" /></Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditing(c); setDialogOpen(true) }}><Edit3 className="h-3 w-3" /></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setViewCustomerId(c.id) }}><Eye className="h-3 w-3" /></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingId(c.id); setDialogOpen(true) }}><Edit3 className="h-3 w-3" /></Button>
                         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteId(c.id) }}><Trash2 className="h-3 w-3" /></Button>
                       </div>
                     </div>
@@ -199,7 +202,7 @@ export function CustomersView() {
 
       <CustomerDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} onSave={handleSave} isSaving={isSaving} />
 
-      <Dialog open={!!viewC} onOpenChange={(o) => !o && setViewC(null)}>
+      <Dialog open={!!viewCustomerId} onOpenChange={(o) => !o && setViewCustomerId(null)}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           {viewC && (() => {
             const customerSales = sales.filter((s) => s.customerId === viewC.id || s.customer?.id === viewC.id)

@@ -194,6 +194,7 @@ model User {
 
   @@index([role, active])
   @@index([phone])
+  @@index([username])
 }
 
 // ============================================================================
@@ -273,6 +274,7 @@ model Customer {
   @@index([name])
   @@index([city])
   @@index([totalDuePaise])
+  @@index([createdAt])
 }
 
 model Supplier {
@@ -300,6 +302,7 @@ model Supplier {
 
   @@index([phone])
   @@index([name])
+  @@index([createdAt])
 }
 
 // ============================================================================
@@ -330,6 +333,7 @@ model GoldStock {
   @@index([currentLocation])
   @@index([supplierId])
   @@index([purchaseDate])
+  @@index([createdAt])
 }
 
 model StoneItem {
@@ -352,6 +356,7 @@ model StoneItem {
   @@index([type, shape])
   @@index([supplierId])
   @@index([remainingQuantity])
+  @@index([createdAt])
 }
 
 // ============================================================================
@@ -438,6 +443,7 @@ model Product {
   @@index([metal, purity])
   @@index([stock])
   @@index([name])
+  @@index([createdAt])
 }
 
 // ============================================================================
@@ -489,6 +495,7 @@ model Sale {
   @@index([createdAt])
   @@index([billedById])
   @@index([dueAmountPaise])
+  @@index([paymentMode])
 }
 
 model SaleItem {
@@ -519,6 +526,7 @@ model SaleItem {
 
   @@index([saleId])
   @@index([productId])
+  @@index([metal])
 }
 
 model Payment {
@@ -545,6 +553,7 @@ model Payment {
   @@index([customerId])
   @@index([date])
   @@index([status])
+  @@index([receivedById])
 }
 
 model SalesReturn {
@@ -567,6 +576,7 @@ model SalesReturn {
 
   @@index([saleId])
   @@index([date])
+  @@index([status])
 }
 
 // ============================================================================
@@ -601,6 +611,8 @@ model Purchase {
   @@index([supplierId])
   @@index([purchaseDate])
   @@index([paymentStatus])
+  @@index([status])
+  @@index([performedById])
 }
 
 model PurchaseItem {
@@ -619,6 +631,7 @@ model PurchaseItem {
   createdAt         DateTime     @default(now())
 
   @@index([purchaseId])
+  @@index([materialType])
 }
 
 // ============================================================================
@@ -650,6 +663,8 @@ model OldGoldExchange {
   @@index([adjustedAgainstSaleId])
   @@index([customerPhone])
   @@index([date])
+  @@index([type])
+  @@index([status])
 }
 
 // ============================================================================
@@ -686,6 +701,7 @@ model WorkflowStep {
   updatedAt      DateTime  @updatedAt
 
   @@index([workflowId, order])
+  @@index([defaultUserId])
 }
 
 model WorkOrder {
@@ -726,6 +742,7 @@ model WorkOrder {
   @@index([status])
   @@index([expectedCompletion])
   @@index([priority])
+  @@index([createdAt])
 }
 
 model WorkOrderStep {
@@ -765,6 +782,7 @@ model WorkHistory {
   timestamp   DateTime  @default(now())
 
   @@index([workOrderId, timestamp])
+  @@index([userId])
 }
 
 model WastageRecord {
@@ -809,6 +827,7 @@ model QualityCheck {
   @@index([workOrderId])
   @@index([checkedById])
   @@index([result])
+  @@index([date])
 }
 
 // ============================================================================

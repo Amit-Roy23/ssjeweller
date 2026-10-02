@@ -73,9 +73,11 @@ export function ProductsView() {
 
   const [search, setSearch] = React.useState('')
   const [catFilter, setCatFilter] = React.useState('ALL')
-  const [editing, setEditing] = React.useState<Product | null>(null)
+  const [editingId, setEditingId] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
+
+  const editing = editingId ? products.find((p) => p.id === editingId) || null : null
 
   const isSaving = addProductMutation.isPending || updateProductMutation.isPending
   const isDeleting = deleteProductMutation.isPending
@@ -124,15 +126,15 @@ export function ProductsView() {
         imageColor: data.imageColor || 'from-amber-400 to-yellow-600',
       }
 
-      if (editing) {
-        await updateProductMutation.mutateAsync({ id: editing.id, data: payload })
+      if (editingId) {
+        await updateProductMutation.mutateAsync({ id: editingId, data: payload })
         toast.success('Product updated successfully')
       } else {
         await addProductMutation.mutateAsync(payload)
         toast.success('Product created successfully')
       }
       setDialogOpen(false)
-      setEditing(null)
+      setEditingId(null)
     } catch (err: any) {
       toast.error(err.message || 'Error saving product')
     }
@@ -155,7 +157,7 @@ export function ProductsView() {
           <h2 className="text-xl font-bold flex items-center gap-2"><Package className="h-5 w-5 text-primary" /> Finished Jewellery</h2>
           <p className="text-sm text-muted-foreground mt-0.5">{products.length} products · {stats.totalUnits} units</p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add Product</Button>
+        <Button onClick={() => { setEditingId(null); setDialogOpen(true) }}><Plus className="h-4 w-4 mr-1.5" /> Add Product</Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -219,7 +221,7 @@ export function ProductsView() {
                           <p className="text-sm font-medium tabular-nums">{p.netWeight.toFixed(2)}g</p>
                         </div>
                         <div className="flex gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(p); setDialogOpen(true) }}><Edit3 className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingId(p.id); setDialogOpen(true) }}><Edit3 className="h-3.5 w-3.5" /></Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                       </div>

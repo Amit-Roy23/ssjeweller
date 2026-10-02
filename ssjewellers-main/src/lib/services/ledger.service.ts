@@ -82,7 +82,7 @@ export const LedgerService = {
   },
 
   /**
-   * Computes overall financial overview metrics within a date range.
+   * Computes overall financial overview metrics within a date range with native DB aggregations.
    */
   async getFinancialOverview(startDate?: Date, endDate?: Date) {
     const dateFilter = {
@@ -90,44 +90,43 @@ export const LedgerService = {
       ...(endDate && { lte: endDate }),
     }
 
-    const [sales, purchases, payments, customers] = await Promise.all([
-      db.sale.findMany({
+    const [salesAgg, purchasesAgg, paymentsAgg, customersAgg] = await Promise.all([
+      db.sale.aggregate({
         where: {
           status: { notIn: [SaleStatus.CANCELLED, SaleStatus.VOID] },
           ...(startDate || endDate ? { createdAt: dateFilter } : {}),
         },
+        _sum: { grandTotalPaise: true, totalGstPaise: true },
+        _count: { id: true },
       }),
-      db.purchase.findMany({
+      db.purchase.aggregate({
         where: {
           status: RecordStatus.ACTIVE,
           ...(startDate || endDate ? { purchaseDate: dateFilter } : {}),
         },
+        _sum: { grandTotalPaise: true },
+        _count: { id: true },
       }),
-      db.payment.findMany({
+      db.payment.aggregate({
         where: {
           status: PaymentStatus.COMPLETED,
           ...(startDate || endDate ? { date: dateFilter } : {}),
         },
+        _sum: { amountPaise: true },
       }),
-      db.customer.findMany({
-        select: { totalDuePaise: true },
+      db.customer.aggregate({
+        _sum: { totalDuePaise: true },
       }),
     ])
 
-    const totalSalesRevenuePaise = sales.reduce((acc, s) => acc + s.grandTotalPaise, 0n)
-    const totalGstCollectedPaise = sales.reduce((acc, s) => acc + s.totalGstPaise, 0n)
-    const totalPurchasesCostPaise = purchases.reduce((acc, p) => acc + p.grandTotalPaise, 0n)
-    const totalPaymentsReceivedPaise = payments.reduce((acc, p) => acc + p.amountPaise, 0n)
-    const totalCustomerOutstandingDuePaise = customers.reduce((acc, c) => acc + c.totalDuePaise, 0n)
-
     return {
-      totalSalesRevenuePaise,
-      totalGstCollectedPaise,
-      totalPurchasesCostPaise,
-      totalPaymentsReceivedPaise,
-      totalCustomerOutstandingDuePaise,
-      totalInvoicesCount: sales.length,
-      totalPurchasesCount: purchases.length,
+      totalSalesRevenuePaise: salesAgg._sum.grandTotalPaise ?? 0n,
+      totalGstCollectedPaise: salesAgg._sum.totalGstPaise ?? 0n,
+      totalPurchasesCostPaise: purchasesAgg._sum.grandTotalPaise ?? 0n,
+      totalPaymentsReceivedPaise: paymentsAgg._sum.amountPaise ?? 0n,
+      totalCustomerOutstandingDuePaise: customersAgg._sum.totalDuePaise ?? 0n,
+      totalInvoicesCount: salesAgg._count.id,
+      totalPurchasesCount: purchasesAgg._count.id,
     }
   },
 }

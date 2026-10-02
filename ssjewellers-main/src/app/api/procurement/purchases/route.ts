@@ -4,7 +4,7 @@ import { MaterialType, PurchasePaymentStatus } from '@prisma/client'
 import { db } from '@/lib/db'
 import { requirePermission } from '@/lib/auth/guards'
 import { ProcurementService } from '@/lib/services/procurement.service'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, RequestTimer } from '@/lib/api-helpers'
 
 const purchaseItemSchema = z.object({
   materialType: z.nativeEnum(MaterialType).default(MaterialType.GOLD_BAR),
@@ -29,31 +29,65 @@ const createPurchaseSchema = z.object({
 
 // GET /api/procurement/purchases - List purchases
 export async function GET(request: NextRequest) {
+  const timer = new RequestTimer()
   try {
     await requirePermission('purchases:read')
     const { searchParams } = new URL(request.url)
 
     const supplierId = searchParams.get('supplierId')
     const paymentStatus = searchParams.get('paymentStatus') as PurchasePaymentStatus | null
+    const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = searchParams.get('limit') ? Math.min(parseInt(searchParams.get('limit')!, 10), 100) : undefined
+    const skip = limit ? (page - 1) * limit : undefined
 
     const where = {
       ...(supplierId ? { supplierId } : {}),
       ...(paymentStatus ? { paymentStatus } : {}),
+      ...(search
+        ? {
+            OR: [
+              { purchaseId: { contains: search, mode: 'insensitive' as const } },
+              { invoiceNumber: { contains: search, mode: 'insensitive' as const } },
+              { supplierName: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
     }
 
-    const purchases = await db.purchase.findMany({
-      where,
-      include: {
-        items: true,
-        supplier: { select: { id: true, name: true, supplierCode: true } },
-        performedBy: { select: { id: true, name: true, username: true } },
-      },
-      orderBy: { purchaseDate: 'desc' },
-    })
+    const [purchases, totalCount] = await timer.track(() =>
+      Promise.all([
+        db.purchase.findMany({
+          where,
+          include: {
+            items: true,
+            supplier: { select: { id: true, name: true, supplierCode: true } },
+            performedBy: { select: { id: true, name: true, username: true } },
+          },
+          orderBy: { purchaseDate: 'desc' },
+          ...(limit ? { take: limit, skip } : {}),
+        }),
+        db.purchase.count({ where }),
+      ])
+    )
 
-    return jsonResponse({ purchases })
+    timer.log('GET', '/api/procurement/purchases', 200)
+    return jsonResponse(
+      {
+        purchases,
+        pagination: {
+          totalCount,
+          page,
+          limit: limit || totalCount,
+          totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        },
+      },
+      undefined,
+      timer
+    )
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Failed to fetch purchases', 500)
+    timer.log('GET', '/api/procurement/purchases', 500)
+    return errorResponse((err as Error).message || 'Failed to fetch purchases', 500, undefined, timer)
   }
 }
 

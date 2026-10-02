@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requirePermission } from '@/lib/auth/guards'
 import { generateCustomerId } from '@/lib/services/sequence.service'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, RequestTimer } from '@/lib/api-helpers'
 
 const createCustomerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -20,12 +20,16 @@ const createCustomerSchema = z.object({
 
 // GET /api/customers - List customers
 export async function GET(request: NextRequest) {
+  const timer = new RequestTimer()
   try {
     await requirePermission('customers:read')
     const { searchParams } = new URL(request.url)
 
     const search = searchParams.get('search') || ''
     const withDuesOnly = searchParams.get('withDues') === 'true'
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = searchParams.get('limit') ? Math.min(parseInt(searchParams.get('limit')!, 10), 100) : undefined
+    const skip = limit ? (page - 1) * limit : undefined
 
     const where = {
       ...(withDuesOnly ? { totalDuePaise: { gt: 0n } } : {}),
@@ -41,14 +45,34 @@ export async function GET(request: NextRequest) {
         : {}),
     }
 
-    const customers = await db.customer.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    })
+    const [customers, totalCount] = await timer.track(() =>
+      Promise.all([
+        db.customer.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          ...(limit ? { take: limit, skip } : {}),
+        }),
+        db.customer.count({ where }),
+      ])
+    )
 
-    return jsonResponse({ customers })
+    timer.log('GET', '/api/customers', 200)
+    return jsonResponse(
+      {
+        customers,
+        pagination: {
+          totalCount,
+          page,
+          limit: limit || totalCount,
+          totalPages: limit ? Math.ceil(totalCount / limit) : 1,
+        },
+      },
+      undefined,
+      timer
+    )
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Failed to fetch customers', 500)
+    timer.log('GET', '/api/customers', 500)
+    return errorResponse((err as Error).message || 'Failed to fetch customers', 500, undefined, timer)
   }
 }
 
