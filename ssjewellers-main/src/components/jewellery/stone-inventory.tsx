@@ -48,10 +48,12 @@ export function StoneInventoryView() {
     type: s.type,
     shape: s.shape,
     size: s.size,
-    quantity: s.quantity,
-    usedQuantity: s.usedQuantity,
-    remainingQuantity: s.remainingQuantity ?? (s.quantity - s.usedQuantity),
-    weight: s.weightCarats ?? s.weight ?? 0,
+    quantity: Number(s.quantity || 0),
+    usedQuantity: Number(s.usedQuantity || 0),
+    remainingQuantity: Number(s.remainingQuantity ?? (s.quantity - s.usedQuantity)),
+    weight: typeof s.weightCarats === 'object' && s.weightCarats != null
+      ? (typeof s.weightCarats.toNumber === 'function' ? s.weightCarats.toNumber() : Number(s.weightCarats.toString ? s.weightCarats.toString() : s.weightCarats))
+      : Number(s.weightCarats ?? s.weight ?? 0),
     unit: s.unit || 'carat',
     purchaseCost: Number(s.purchaseCostPaise || 0) / 100,
     supplierId: s.supplierId || undefined,
@@ -276,7 +278,7 @@ function StoneDialog({ open, onOpenChange, editing, suppliers, isSaving, onSave 
             <Input type="number" value={form.quantity ?? 0} onChange={(e) => update({ quantity: parseInt(e.target.value) || 0 })} />
           </div>
           <div className="space-y-1.5">
-            <Label>Weight ({form.unit})</Label>
+            <Label>Weight ({form.unit || 'carat'})</Label>
             <Input type="number" step="0.01" value={form.weight ?? 0} onChange={(e) => update({ weight: parseFloat(e.target.value) || 0 })} />
           </div>
           <div className="space-y-1.5">

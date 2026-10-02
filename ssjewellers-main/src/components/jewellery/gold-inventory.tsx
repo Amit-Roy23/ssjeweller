@@ -472,7 +472,18 @@ function GoldStockDialog({ open, onOpenChange, editing, suppliers, defaultGoldRa
           <div className="space-y-1.5"><Label>Purity</Label>
             <Select value={form.purity} onValueChange={selectPurity}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{purities.filter((p) => p.active !== false).map((p) => <SelectItem key={p.id} value={p.label}>{p.label} ({p.percentage}%)</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {purities.filter((p) => p.active !== false).map((p) => {
+                  const pct = typeof p.percentage === 'object' && p.percentage != null
+                    ? (typeof p.percentage.toNumber === 'function' ? p.percentage.toNumber() : Number(p.percentage.toString ? p.percentage.toString() : p.percentage))
+                    : Number(p.percentage || 0)
+                  return (
+                    <SelectItem key={p.id} value={p.label}>
+                      {p.label} ({pct}%)
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5"><Label>Gross Weight (g) *</Label><Input type="number" step="0.001" value={form.grossWeight ?? 0} onChange={(e) => update({ grossWeight: parseFloat(e.target.value) || 0 })} /></div>

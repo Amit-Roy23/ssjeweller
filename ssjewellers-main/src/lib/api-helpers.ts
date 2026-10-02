@@ -18,6 +18,21 @@ export function serializeBigInt<T>(obj: T): T {
   if (typeof obj === 'object') {
     if (obj instanceof Date) return obj
 
+    // Automatically serialize Prisma Decimal (Decimal.js instance or Decimal-like object with {s, e, d})
+    if (typeof (obj as any)?.toNumber === 'function') {
+      return (obj as any).toNumber()
+    }
+    if (
+      's' in (obj as any) &&
+      'e' in (obj as any) &&
+      'd' in (obj as any) &&
+      Array.isArray((obj as any).d)
+    ) {
+      return (typeof (obj as any).toString === 'function'
+        ? Number((obj as any).toString())
+        : Number(obj)) as unknown as T
+    }
+
     const result: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(obj)) {
       result[key] = serializeBigInt(value)
