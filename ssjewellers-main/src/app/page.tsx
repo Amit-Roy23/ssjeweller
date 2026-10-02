@@ -360,9 +360,9 @@ function AppShell() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="h-screen h-[100dvh] flex flex-col bg-background text-foreground overflow-hidden">
       {/* ===== Top header ===== */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+      <header className="shrink-0 border-b border-border bg-background/80 backdrop-blur-md z-40">
         <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
           {/* Mobile hamburger */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -522,9 +522,9 @@ function AppShell() {
       </header>
 
       {/* ===== Body ===== */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Desktop sidebar */}
-        <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-sidebar/50">
+        <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-sidebar/50 h-full overflow-hidden">
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto scroll-slim">
             {allowedItems.map((item) => {
               const Icon = item.icon
@@ -545,7 +545,7 @@ function AppShell() {
               )
             })}
           </nav>
-          <div className="p-3 border-t border-border">
+          <div className="p-3 border-t border-border shrink-0">
             <div className="rounded-lg bg-gold-gradient p-3 text-white">
               <p className="text-xs font-semibold flex items-center gap-1"><Coins className="h-3 w-3" /> Gold Rate (24K)</p>
               <p className="text-lg font-bold leading-tight">
@@ -558,7 +558,7 @@ function AppShell() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0 overflow-x-hidden pb-20 md:pb-6">
+        <main className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden scroll-slim pb-20 md:pb-6">
           <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
             {renderView()}
           </div>
