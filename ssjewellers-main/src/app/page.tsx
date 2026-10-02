@@ -3,20 +3,26 @@
 import * as React from 'react'
 import { ThemeProvider } from '@/components/theme-provider'
 import {
-  LayoutDashboard, Workflow, Package, Factory, ShoppingCart, ReceiptIndianRupee,
-  Users, Truck, BarChart3, UserCog, ScrollText, Settings, Gem, Menu, Search, Bell, LogOut, Coins,
+  LayoutDashboard, Workflow, Package, ShoppingCart, ReceiptIndianRupee,
+  Users, Truck, BarChart3, UserCog, ScrollText, Settings, Gem, Menu, Search, Bell, LogOut, Coins, KeyRound, Lock, Eye, EyeOff, ArrowRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import {
   Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover'
-import { useJewelleryStore, relativeTime } from '@/lib/store'
+import { useJewelleryStore, relativeTime, ViewKey } from '@/lib/store'
+import { useAuthMe, useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, useSettings, queryKeys } from '@/lib/hooks/use-erp-queries'
+import { useQueryClient } from '@tanstack/react-query'
+import { apiClient } from '@/lib/api-client'
+import { toast } from 'sonner'
 import { LoginPage } from '@/components/jewellery/login-page'
 import { Dashboard } from '@/components/jewellery/dashboard'
 import { WorkflowView } from '@/components/jewellery/workflow-view'
@@ -31,11 +37,6 @@ import { ReportsView } from '@/components/jewellery/reports'
 import { UsersView } from '@/components/jewellery/users'
 import { AuditLogView } from '@/components/jewellery/audit-log'
 import { SettingsView } from '@/components/jewellery/settings'
-
-export type ViewKey =
-  | 'dashboard' | 'workflow' | 'gold' | 'stones' | 'products'
-  | 'purchase' | 'sales' | 'customers' | 'suppliers'
-  | 'reports' | 'users' | 'audit' | 'settings'
 
 interface NavItem {
   key: ViewKey
@@ -78,27 +79,228 @@ export default function Home() {
   )
 }
 
-function AppShell() {
-  const [loggedIn, setLoggedIn] = React.useState(false)
-  const [active, setActive] = React.useState<ViewKey>('dashboard')
-  const [mobileOpen, setMobileOpen] = React.useState(false)
-  const hydrateSeed = useJewelleryStore((s) => s.hydrateSeed)
-  const currentUser = useJewelleryStore((s) => s.currentUser)
+function MustChangePasswordScreen({ onPasswordChanged }: { onPasswordChanged: () => void }) {
+  const [currentPassword, setCurrentPassword] = React.useState('')
+  const [newPassword, setNewPassword] = React.useState('')
+  const [confirmPassword, setConfirmPassword] = React.useState('')
+  const [showCurrent, setShowCurrent] = React.useState(false)
+  const [showNew, setShowNew] = React.useState(false)
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState('')
   const logout = useJewelleryStore((s) => s.logout)
-  const settings = useJewelleryStore((s) => s.settings)
-  const notifications = useJewelleryStore((s) => s.notifications)
-  const markNotificationRead = useJewelleryStore((s) => s.markNotificationRead)
-  const markAllNotificationsRead = useJewelleryStore((s) => s.markAllNotificationsRead)
 
-  React.useEffect(() => { hydrateSeed() }, [hydrateSeed])
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
 
-  // Restore session from store on mount
+    if (!currentPassword) {
+      setError('Please enter your current password.')
+      return
+    }
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters long.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('New password and confirmation do not match.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        const errorMsg = data.error || 'Failed to update password'
+        setError(errorMsg)
+        toast.error(errorMsg)
+        return
+      }
+
+      toast.success('Password changed successfully! Welcome to S.S Jewellery.')
+      onPasswordChanged()
+    } catch {
+      const msg = 'Network error while updating password.'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      // ignore
+    }
+    logout()
+    window.location.reload()
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <Card className="w-full max-w-md shadow-2xl border-border">
+        <CardHeader className="text-center space-y-2">
+          <div className="mx-auto h-12 w-12 rounded-xl bg-gold-gradient flex items-center justify-center shadow-md">
+            <KeyRound className="h-6 w-6 text-white" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Password Change Required</CardTitle>
+          <CardDescription className="text-sm">
+            For security purposes, you must change your temporary or initial password before accessing the system.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="current-pwd">Current Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="current-pwd"
+                  type={showCurrent ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  className="pl-10 pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrent(!showCurrent)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="new-pwd">New Password (min 8 chars)</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="new-pwd"
+                  type={showNew ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new strong password"
+                  className="pl-10 pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(!showNew)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-pwd">Confirm New Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="confirm-pwd"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Updating Password…' : <>Change Password &amp; Continue <ArrowRight className="h-4 w-4 ml-2" /></>}
+            </Button>
+
+            <Button type="button" variant="outline" className="w-full text-muted-foreground" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" /> Log Out
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function AppShell() {
+  const queryClient = useQueryClient()
+  const { data: authData, isLoading: isAuthLoading, refetch: refetchAuth } = useAuthMe()
+  const { data: settingsData } = useSettings()
+  const { data: notificationsData } = useNotifications()
+  const markNotificationRead = useMarkNotificationRead()
+  const markAllNotificationsRead = useMarkAllNotificationsRead()
+
+  const storeUser = useJewelleryStore((s) => s.currentUser)
+  const setCurrentUser = useJewelleryStore((s) => s.setCurrentUser)
+  const active = useJewelleryStore((s) => s.activeView)
+  const setActive = useJewelleryStore((s) => s.setActiveView)
+  const logout = useJewelleryStore((s) => s.logout)
+  const [mobileOpen, setMobileOpen] = React.useState(false)
+
+  const currentUser = authData?.user ?? storeUser
+
+  // Sync auth data from server query into Zustand UI store
   React.useEffect(() => {
-    if (currentUser) setLoggedIn(true)
-  }, [currentUser])
+    if (authData?.user) {
+      setCurrentUser(authData.user)
+    }
+  }, [authData, setCurrentUser])
 
-  if (!loggedIn || !currentUser) {
-    return <LoginPage onLoggedIn={() => setLoggedIn(true)} />
+  // Fallback defaults for settings
+  const settings = settingsData?.settings || {
+    shopName: 'S.S Jewellery',
+    city: 'Kolkata',
+    defaultGoldRate24K: 7250,
+  }
+
+  const notifications = notificationsData?.notifications || []
+
+  // Check login state
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading S.S Jewellery ERP…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentUser) {
+    return (
+      <LoginPage
+        onLoggedIn={() => {
+          refetchAuth()
+        }}
+      />
+    )
+  }
+
+  // If user is required to change password, render strictly the password change screen
+  if (currentUser.mustChangePassword) {
+    return (
+      <MustChangePasswordScreen
+        onPasswordChanged={async () => {
+          await refetchAuth()
+        }}
+      />
+    )
   }
 
   const allowedItems = NAV_ITEMS.filter((n) => n.roles.includes(currentUser.role))
@@ -114,10 +316,28 @@ function AppShell() {
   )
   const unreadCount = myNotifications.filter((n) => !n.read).length
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      // Ignore network error on logout
+    }
     logout()
-    setLoggedIn(false)
+    queryClient.clear()
     setActive('dashboard')
+  }
+
+  const handleMarkAllRead = () => {
+    markAllNotificationsRead.mutate(undefined, {
+      onSuccess: () => toast.success('All notifications marked as read'),
+      onError: (err) => toast.error((err as Error).message || 'Failed to mark notifications read'),
+    })
+  }
+
+  const handleMarkOneRead = (id: string) => {
+    markNotificationRead.mutate(id, {
+      onError: (err) => toast.error((err as Error).message || 'Failed to update notification'),
+    })
   }
 
   const renderView = () => {
@@ -228,7 +448,7 @@ function AppShell() {
                 <div className="flex items-center justify-between p-3 border-b border-border">
                   <p className="text-sm font-semibold">Notifications</p>
                   {unreadCount > 0 && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => markAllNotificationsRead(currentUser.id)}>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead} disabled={markAllNotificationsRead.isPending}>
                       Mark all read
                     </Button>
                   )}
@@ -240,7 +460,7 @@ function AppShell() {
                     myNotifications.slice(0, 20).map((n) => (
                       <button
                         key={n.id}
-                        onClick={() => markNotificationRead(n.id)}
+                        onClick={() => handleMarkOneRead(n.id)}
                         className={`w-full text-left p-3 border-b border-border last:border-0 hover:bg-accent/50 transition-colors ${!n.read ? 'bg-primary/5' : ''}`}
                       >
                         <div className="flex items-start gap-2">
@@ -248,7 +468,7 @@ function AppShell() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium">{n.title}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
-                            <p className="text-[10px] text-muted-foreground mt-1">{relativeTime(n.timestamp)}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">{relativeTime(n.timestamp || n.createdAt)}</p>
                           </div>
                         </div>
                       </button>
@@ -329,7 +549,7 @@ function AppShell() {
             <div className="rounded-lg bg-gold-gradient p-3 text-white">
               <p className="text-xs font-semibold flex items-center gap-1"><Coins className="h-3 w-3" /> Gold Rate (24K)</p>
               <p className="text-lg font-bold leading-tight">
-                ₹{settings.defaultGoldRate24K.toLocaleString('en-IN')}
+                ₹{Number(settings.defaultGoldRate24K).toLocaleString('en-IN')}
                 <span className="text-[10px] font-normal opacity-80 ml-1">/g</span>
               </p>
               <p className="text-[10px] opacity-80 mt-1">{settings.city} · Today</p>

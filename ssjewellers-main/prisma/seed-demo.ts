@@ -152,7 +152,8 @@ async function main() {
   }
 
   // 6. Users
-  const defaultHash = await bcrypt.hash('ssj@demo123', 10)
+  const defaultPassword = process.env.DEMO_USER_PASSWORD || process.env.PW_ADMIN || 'SecureInitialAuth@2026'
+  const defaultHash = await bcrypt.hash(defaultPassword, 10)
   const users = [
     { id: 'usr-admin', username: 'admin', name: 'Suresh Shah (Admin)', phone: '+91 98250 12345', email: 'admin@ssjewellery.in', role: UserRole.ADMIN, passwordHash: defaultHash, active: true, createdAt: daysAgo(365), lastLogin: hoursAgo(2) },
     { id: 'usr-manager', username: 'manager', name: 'Priya Mehta (Manager)', phone: '+91 98250 77882', email: 'priya@ssjewellery.in', role: UserRole.MANAGER, passwordHash: defaultHash, active: true, createdAt: daysAgo(200), lastLogin: hoursAgo(1) },

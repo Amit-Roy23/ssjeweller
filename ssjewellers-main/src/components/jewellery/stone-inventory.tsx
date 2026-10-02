@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Plus, Search, Gem, Edit3, Trash2 } from 'lucide-react'
+import { Plus, Search, Gem, Edit3, Trash2, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,16 +18,54 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useJewelleryStore, formatCurrency, formatCompact } from '@/lib/store'
+import { formatCurrency, formatCompact } from '@/lib/store'
 import { type StoneItem } from '@/lib/types'
+import {
+  useStones,
+  useAddStone,
+  useUpdateStone,
+  useDeleteStone,
+  useSuppliers,
+  useSettings,
+} from '@/lib/hooks/use-erp-queries'
 import { toast } from 'sonner'
 
 export function StoneInventoryView() {
-  const { stones, suppliers, settings, addStone, updateStone, deleteStone } = useJewelleryStore()
+  const { data: stonesData, isLoading: loading } = useStones()
+  const { data: suppliersData } = useSuppliers()
+  const { data: settingsData } = useSettings()
+
+  const addStoneMutation = useAddStone()
+  const updateStoneMutation = useUpdateStone()
+  const deleteStoneMutation = useDeleteStone()
+
+  const currency = settingsData?.settings?.currency || '₹'
+  const suppliers = (suppliersData?.suppliers || []) as any[]
+
+  const stones: StoneItem[] = (stonesData?.stones || []).map((s: any) => ({
+    id: s.id,
+    stoneId: s.stoneId,
+    type: s.type,
+    shape: s.shape,
+    size: s.size,
+    quantity: s.quantity,
+    usedQuantity: s.usedQuantity,
+    remainingQuantity: s.remainingQuantity ?? (s.quantity - s.usedQuantity),
+    weight: s.weightCarats ?? s.weight ?? 0,
+    unit: s.unit || 'carat',
+    purchaseCost: Number(s.purchaseCostPaise || 0) / 100,
+    supplierId: s.supplierId || undefined,
+    supplierName: s.supplier?.name || undefined,
+    createdAt: s.createdAt,
+  }))
+
   const [search, setSearch] = React.useState('')
   const [editing, setEditing] = React.useState<StoneItem | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
+
+  const isSaving = addStoneMutation.isPending || updateStoneMutation.isPending
+  const isDeleting = deleteStoneMutation.isPending
 
   const filtered = stones.filter((s) => {
     const q = search.trim().toLowerCase()
@@ -41,6 +79,44 @@ export function StoneInventoryView() {
     lowStock: stones.filter((s) => s.remainingQuantity <= 5).length,
   }
 
+  const handleSave = async (data: Partial<StoneItem>) => {
+    try {
+      const payload = {
+        stoneId: data.stoneId,
+        type: data.type || 'Diamond',
+        shape: data.shape || 'Round',
+        size: data.size || '1ct',
+        quantity: data.quantity ?? 1,
+        weightCarats: data.weight ?? 1,
+        unit: data.unit || 'carat',
+        purchaseCostPaise: Math.round((data.purchaseCost || 0) * 100),
+        supplierId: data.supplierId || null,
+      }
+
+      if (editing) {
+        await updateStoneMutation.mutateAsync({ id: editing.id, data: payload })
+        toast.success('Stone updated successfully')
+      } else {
+        await addStoneMutation.mutateAsync(payload)
+        toast.success('Stone added successfully')
+      }
+      setDialogOpen(false)
+      setEditing(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving stone')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteStoneMutation.mutateAsync(id)
+      toast.success('Stone removed successfully')
+      setDeleteId(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Error deleting stone')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
@@ -52,7 +128,7 @@ export function StoneInventoryView() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Total Value</p><p className="text-base md:text-lg font-bold mt-0.5">{formatCompact(stats.totalValue, settings.currency)}</p></CardContent></Card>
+        <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Total Value</p><p className="text-base md:text-lg font-bold mt-0.5">{formatCompact(stats.totalValue, currency)}</p></CardContent></Card>
         <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Total Carats</p><p className="text-base md:text-lg font-bold mt-0.5">{stats.totalCarats}</p></CardContent></Card>
         <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Remaining Qty</p><p className="text-base md:text-lg font-bold mt-0.5">{stats.totalQty}</p></CardContent></Card>
         <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Low Stock</p><p className="text-base md:text-lg font-bold mt-0.5 text-amber-600 dark:text-amber-400">{stats.lowStock}</p></CardContent></Card>
@@ -65,7 +141,9 @@ export function StoneInventoryView() {
         </div>
       </CardContent></Card>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <Card><CardContent className="py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /><p className="text-sm text-muted-foreground mt-2">Loading stone inventory...</p></CardContent></Card>
+      ) : filtered.length === 0 ? (
         <Card><CardContent className="py-12 text-center"><Gem className="h-12 w-12 mx-auto text-muted-foreground/50" /><p className="text-sm text-muted-foreground mt-3">No stones found</p></CardContent></Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -84,8 +162,8 @@ export function StoneInventoryView() {
                       <div className="grid grid-cols-2 gap-1 mt-2 text-xs">
                         <div><p className="text-[10px] text-muted-foreground">Quantity</p><p className="font-medium">{s.remainingQuantity}/{s.quantity}</p></div>
                         <div><p className="text-[10px] text-muted-foreground">Weight</p><p className="font-medium">{s.weight} {s.unit}</p></div>
-                        <div><p className="text-[10px] text-muted-foreground">Cost</p><p className="font-medium">{formatCompact(s.purchaseCost, settings.currency)}</p></div>
-                        <div><p className="text-[10px] text-muted-foreground">Supplier</p><p className="font-medium text-xs truncate">{s.supplierName ?? '-'}</p></div>
+                        <div><p className="text-[10px] text-muted-foreground">Cost</p><p className="font-medium">{formatCurrency(s.purchaseCost, currency)}</p></div>
+                        <div><p className="text-[10px] text-muted-foreground">Supplier</p><p className="font-medium text-xs truncate">{s.supplierName ?? 'Direct Purchase'}</p></div>
                       </div>
                       <div className="mt-2">
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
@@ -106,59 +184,134 @@ export function StoneInventoryView() {
         </div>
       )}
 
-      <StoneDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} suppliers={suppliers} onSave={(data) => {
-        if (editing) { updateStone(editing.id, data); toast.success('Stone updated') }
-        else { addStone(data as Omit<StoneItem, 'id' | 'createdAt' | 'remainingQuantity'>); toast.success('Stone added') }
-        setDialogOpen(false)
-      }} />
+      <StoneDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editing={editing}
+        suppliers={suppliers}
+        isSaving={isSaving}
+        onSave={handleSave}
+      />
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Delete this stone?</AlertDialogTitle><AlertDialogDescription>The stone record will be removed.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (deleteId) { deleteStone(deleteId); toast.success('Stone removed'); setDeleteId(null) } }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this stone?</AlertDialogTitle>
+            <AlertDialogDescription>The stone record will be removed from inventory.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteId && handleDelete(deleteId)}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   )
 }
 
-function StoneDialog({ open, onOpenChange, editing, suppliers, onSave }: {
+function StoneDialog({ open, onOpenChange, editing, suppliers, isSaving, onSave }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   editing: StoneItem | null
-  suppliers: ReturnType<typeof useJewelleryStore.getState>['suppliers']
+  suppliers: any[]
+  isSaving: boolean
   onSave: (data: Partial<StoneItem>) => void
 }) {
   const [form, setForm] = React.useState<Partial<StoneItem>>({})
 
   React.useEffect(() => {
-    if (open) setForm(editing ?? { stoneId: '', type: 'Diamond', shape: 'Round', size: '', quantity: 0, weight: 0, unit: 'carat', purchaseCost: 0, usedQuantity: 0 })
+    if (open) setForm(editing ?? {
+      stoneId: `DM-${Date.now().toString().slice(-4)}`,
+      type: 'Diamond',
+      shape: 'Round',
+      size: '0.5ct',
+      quantity: 1,
+      weight: 0.5,
+      unit: 'carat',
+      purchaseCost: 0,
+      usedQuantity: 0,
+    })
   }, [open, editing])
 
   const update = (patch: Partial<StoneItem>) => setForm((f) => ({ ...f, ...patch }))
   const valid = (form.stoneId?.trim()?.length ?? 0) > 0 && (form.quantity ?? 0) > 0
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => !isSaving && onOpenChange(o)}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{editing ? 'Edit Stone' : 'Add Stone'}</DialogTitle><DialogDescription>{editing ? `Editing ${editing.stoneId}` : 'Add a new stone or diamond'}</DialogDescription></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{editing ? 'Edit Stone' : 'Add Stone'}</DialogTitle>
+          <DialogDescription>{editing ? `Editing ${editing.stoneId}` : 'Add a new stone or diamond lot'}</DialogDescription>
+        </DialogHeader>
         <div className="grid grid-cols-2 gap-3 py-2">
-          <div className="space-y-1.5 col-span-2"><Label>Stone ID *</Label><Input value={form.stoneId ?? ''} onChange={(e) => update({ stoneId: e.target.value })} placeholder="DM-001" /></div>
-          <div className="space-y-1.5"><Label>Type</Label><Input value={form.type ?? ''} onChange={(e) => update({ type: e.target.value })} placeholder="Diamond / Ruby / Emerald" /></div>
-          <div className="space-y-1.5"><Label>Shape</Label><Input value={form.shape ?? ''} onChange={(e) => update({ shape: e.target.value })} placeholder="Round / Oval / Princess" /></div>
-          <div className="space-y-1.5"><Label>Size</Label><Input value={form.size ?? ''} onChange={(e) => update({ size: e.target.value })} placeholder="0.3ct / 4x6mm" /></div>
-          <div className="space-y-1.5"><Label>Unit</Label><Input value={form.unit ?? 'carat'} onChange={(e) => update({ unit: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Quantity *</Label><Input type="number" value={form.quantity ?? 0} onChange={(e) => update({ quantity: parseInt(e.target.value) || 0 })} /></div>
-          <div className="space-y-1.5"><Label>Weight ({form.unit})</Label><Input type="number" step="0.01" value={form.weight ?? 0} onChange={(e) => update({ weight: parseFloat(e.target.value) || 0 })} /></div>
-          <div className="space-y-1.5"><Label>Purchase Cost (₹)</Label><Input type="number" value={form.purchaseCost ?? 0} onChange={(e) => update({ purchaseCost: parseFloat(e.target.value) || 0 })} /></div>
-          <div className="space-y-1.5"><Label>Used Quantity</Label><Input type="number" value={form.usedQuantity ?? 0} onChange={(e) => update({ usedQuantity: parseInt(e.target.value) || 0 })} /></div>
-          <div className="space-y-1.5 col-span-2"><Label>Supplier</Label>
-            <Select value={form.supplierId ?? 'none'} onValueChange={(v) => { if (v === 'none') { update({ supplierId: undefined, supplierName: undefined }); return } const sup = suppliers.find((s) => s.id === v); update({ supplierId: v, supplierName: sup?.name }) }}>
-              <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger><SelectContent><SelectItem value="none">No supplier</SelectItem>{suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+          <div className="space-y-1.5 col-span-2">
+            <Label>Stone ID *</Label>
+            <Input value={form.stoneId ?? ''} onChange={(e) => update({ stoneId: e.target.value })} placeholder="DM-001" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Type</Label>
+            <Input value={form.type ?? ''} onChange={(e) => update({ type: e.target.value })} placeholder="Diamond / Ruby / Emerald" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Shape</Label>
+            <Input value={form.shape ?? ''} onChange={(e) => update({ shape: e.target.value })} placeholder="Round / Oval / Princess" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Size</Label>
+            <Input value={form.size ?? ''} onChange={(e) => update({ size: e.target.value })} placeholder="0.3ct / 4x6mm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Unit</Label>
+            <Input value={form.unit ?? 'carat'} onChange={(e) => update({ unit: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Quantity *</Label>
+            <Input type="number" value={form.quantity ?? 0} onChange={(e) => update({ quantity: parseInt(e.target.value) || 0 })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Weight ({form.unit})</Label>
+            <Input type="number" step="0.01" value={form.weight ?? 0} onChange={(e) => update({ weight: parseFloat(e.target.value) || 0 })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Purchase Cost (₹)</Label>
+            <Input type="number" value={form.purchaseCost ?? 0} onChange={(e) => update({ purchaseCost: parseFloat(e.target.value) || 0 })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Used Quantity</Label>
+            <Input type="number" value={form.usedQuantity ?? 0} onChange={(e) => update({ usedQuantity: parseInt(e.target.value) || 0 })} />
+          </div>
+          <div className="space-y-1.5 col-span-2">
+            <Label>Supplier</Label>
+            <Select value={form.supplierId ?? 'none'} onValueChange={(v) => {
+              if (v === 'none') {
+                update({ supplierId: undefined, supplierName: undefined })
+                return
+              }
+              const sup = suppliers.find((s) => s.id === v)
+              update({ supplierId: v, supplierName: sup?.name })
+            }}>
+              <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No supplier</SelectItem>
+                {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+              </SelectContent>
             </Select>
           </div>
         </div>
-        <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button onClick={() => valid && onSave(form)} disabled={!valid}>{editing ? 'Save Changes' : 'Add Stone'}</Button></DialogFooter>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
+          <Button onClick={() => valid && onSave(form)} disabled={!valid || isSaving}>
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+            {editing ? 'Save Changes' : 'Add Stone'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

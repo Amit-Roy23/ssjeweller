@@ -20,3 +20,28 @@ export async function GET() {
     return errorResponse((err as Error).message || 'Failed to fetch notifications', 500)
   }
 }
+
+// POST /api/notifications - Create notification
+export async function POST(request: Request) {
+  try {
+    const user = await requireAuth()
+    const body = await request.json()
+    if (!body.title || !body.message) {
+      return errorResponse('Title and message are required', 400)
+    }
+
+    const notification = await db.appNotification.create({
+      data: {
+        title: body.title,
+        message: body.message,
+        type: body.type || 'INFO',
+        forUserId: body.forUserId || null,
+        read: false,
+      },
+    })
+
+    return jsonResponse({ success: true, notification }, { status: 201 })
+  } catch (err: unknown) {
+    return errorResponse((err as Error).message || 'Failed to create notification', 400)
+  }
+}

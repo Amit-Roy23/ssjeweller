@@ -10,9 +10,9 @@ export interface User {
   phone: string
   email?: string
   role: UserRole
-  password: string // mock — plain text for demo only
   active: boolean
   specialty?: string // e.g. "Melting", "Polishing"
+  mustChangePassword?: boolean
   createdAt: string
   lastLogin?: string
 }
@@ -214,6 +214,7 @@ export interface Product {
   barcode: string
   name: string
   category: string
+  categoryId?: string
   subCategory?: string
   designNumber?: string
   metal: MetalType

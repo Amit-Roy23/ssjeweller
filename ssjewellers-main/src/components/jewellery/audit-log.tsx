@@ -1,14 +1,15 @@
 'use client'
 
 import * as React from 'react'
-import { ScrollText, Search, Filter } from 'lucide-react'
+import { ScrollText, Search, Filter, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { useJewelleryStore, formatDateTime } from '@/lib/store'
+import { formatDateTime } from '@/lib/store'
+import { useAuditLogs } from '@/lib/hooks/use-erp-queries'
 
 const ACTION_COLORS: Record<string, string> = {
   LOGIN: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
@@ -27,18 +28,30 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 export function AuditLogView() {
-  const { auditLogs } = useJewelleryStore()
   const [search, setSearch] = React.useState('')
   const [actionFilter, setActionFilter] = React.useState('ALL')
 
-  const filtered = auditLogs.filter((l) => {
-    const q = search.trim().toLowerCase()
-    const matchQ = !q || l.userName.toLowerCase().includes(q) || l.action.toLowerCase().includes(q) || (l.entityId ?? '').toLowerCase().includes(q) || (l.details ?? '').toLowerCase().includes(q)
-    const matchA = actionFilter === 'ALL' || l.action === actionFilter
-    return matchQ && matchA
+  const { data: auditData, isLoading: loading } = useAuditLogs({
+    search: search || undefined,
+    limit: 100,
   })
 
-  const actionTypes = Array.from(new Set(auditLogs.map((l) => l.action)))
+  const auditLogs = (auditData?.auditLogs || []).map((l: any) => ({
+    id: l.id,
+    userName: l.userName || l.user?.name || 'System',
+    action: l.action,
+    entity: l.entity,
+    entityId: l.entityId || undefined,
+    details: l.details || undefined,
+    timestamp: l.timestamp || l.createdAt,
+  }))
+
+  const filtered = auditLogs.filter((l: any) => {
+    const matchA = actionFilter === 'ALL' || l.action === actionFilter
+    return matchA
+  })
+
+  const actionTypes = Array.from(new Set(auditLogs.map((l: any) => l.action))) as string[]
 
   return (
     <div className="space-y-4">
@@ -63,16 +76,18 @@ export function AuditLogView() {
         </div>
       </CardContent></Card>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <Card><CardContent className="py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /><p className="text-sm text-muted-foreground mt-2">Loading audit logs...</p></CardContent></Card>
+      ) : filtered.length === 0 ? (
         <Card><CardContent className="py-12 text-center"><ScrollText className="h-12 w-12 mx-auto text-muted-foreground/50" /><p className="text-sm text-muted-foreground mt-3">No audit entries found</p></CardContent></Card>
       ) : (
         <Card>
           <CardContent className="p-0">
             <div className="max-h-[70vh] overflow-y-auto scroll-slim">
-              {filtered.slice(0, 100).map((log) => (
+              {filtered.map((log: any) => (
                 <div key={log.id} className="flex items-start gap-3 p-3 border-b border-border last:border-0 hover:bg-muted/30">
                   <div className="h-8 w-8 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {log.userName.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
+                    {(log.userName || 'U').split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

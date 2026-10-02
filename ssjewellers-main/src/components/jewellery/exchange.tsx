@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import {
-  Plus, Repeat, Edit3, Trash2, Gem, ArrowLeftRight, Banknote,
+  Plus, Repeat, Trash2, ArrowLeftRight, Banknote, Loader2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,19 +15,44 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { useJewelleryStore, formatCurrency, formatDate } from '@/lib/store'
+import { formatCurrency, formatDate } from '@/lib/store'
 import { KARAT_OPTIONS, type OldGoldExchange, type ExchangeType, type KaratType } from '@/lib/types'
+import {
+  useExchanges,
+  useCreateExchange,
+  useSettings,
+} from '@/lib/hooks/use-erp-queries'
 import { toast } from 'sonner'
 
 export function ExchangeView() {
-  const { exchanges, settings, addExchange, updateExchange, deleteExchange } = useJewelleryStore()
-  const [editing, setEditing] = React.useState<OldGoldExchange | null>(null)
+  const { data: exchangeData, isLoading: loading } = useExchanges()
+  const { data: settingsData } = useSettings()
+  const createExchangeMutation = useCreateExchange()
+
+  const currency = settingsData?.settings?.currency || '₹'
+  const defaultGoldRate = Number(settingsData?.settings?.defaultGoldRate24K || 7200)
+
+  const exchanges: OldGoldExchange[] = (exchangeData?.exchanges || []).map((e: any) => ({
+    id: e.id,
+    voucherNo: e.voucherNo,
+    customerName: e.customerName,
+    customerPhone: e.customerPhone,
+    type: e.type,
+    itemDescription: e.itemDescription,
+    grossWeight: Number(e.grossWeightMg || 0) / 1000,
+    netWeight: Number(e.netWeightMg || 0) / 1000,
+    karat: e.karat,
+    touch: Number(e.touchBps || 0) / 100,
+    ratePerGram: Number(e.ratePaisePerGram || 0) / 100,
+    totalValue: Number(e.totalValuePaise || 0) / 100,
+    adjustedAgainstSaleId: e.adjustedAgainstSaleId || undefined,
+    adjustedAgainstInvoice: e.adjustedAgainstInvoice || undefined,
+    paidAmount: Number(e.paidAmountPaise || 0) / 100,
+    date: String(e.date || e.createdAt),
+    createdAt: e.createdAt,
+  }))
+
   const [dialogOpen, setDialogOpen] = React.useState(false)
-  const [deleteId, setDeleteId] = React.useState<string | null>(null)
   const [typeFilter, setTypeFilter] = React.useState<string>('ALL')
 
   const filtered = React.useMemo(() => {
@@ -46,9 +71,30 @@ export function ExchangeView() {
     }
   }, [exchanges])
 
-  const openAdd = () => { setEditing(null); setDialogOpen(true) }
-  const openEdit = (e: OldGoldExchange) => { setEditing(e); setDialogOpen(true) }
-  const handleDelete = () => { if (deleteId) { deleteExchange(deleteId); toast.success('Voucher removed'); setDeleteId(null) } }
+  const handleSave = async (data: Partial<OldGoldExchange>) => {
+    try {
+      const payload = {
+        customerName: data.customerName,
+        customerPhone: data.customerPhone || '9999999999',
+        type: data.type || 'BUY',
+        itemDescription: data.itemDescription,
+        grossWeightMg: Math.round((data.grossWeight || 0) * 1000),
+        netWeightMg: Math.round((data.netWeight || 0) * 1000),
+        karat: data.karat || '22K',
+        touchBps: Math.round((data.touch || 91.6) * 100),
+        ratePaisePerGram: Math.round((data.ratePerGram || 0) * 100),
+        adjustedAgainstInvoice: data.adjustedAgainstInvoice || null,
+        paidAmountPaise: Math.round((data.paidAmount || 0) * 100),
+        date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
+      }
+
+      const res = await createExchangeMutation.mutateAsync(payload)
+      toast.success(`Exchange voucher ${res.exchange?.voucherNo || 'created'} generated successfully`)
+      setDialogOpen(false)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create exchange voucher')
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -62,7 +108,7 @@ export function ExchangeView() {
             Buy-back and exchange tracking · {exchanges.length} vouchers
           </p>
         </div>
-        <Button onClick={openAdd} className="shrink-0">
+        <Button onClick={() => setDialogOpen(true)} className="shrink-0">
           <Plus className="h-4 w-4 mr-1.5" />
           New Voucher
         </Button>
@@ -72,20 +118,20 @@ export function ExchangeView() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card><CardContent className="p-3">
           <p className="text-[11px] text-muted-foreground">Today&apos;s Buy/Exchange</p>
-          <p className="text-base md:text-lg font-bold mt-0.5">{formatCurrency(stats.todayValue, settings.currency)}</p>
+          <p className="text-base md:text-lg font-bold mt-0.5">{formatCurrency(stats.todayValue, currency)}</p>
           <p className="text-[10px] text-muted-foreground mt-0.5">{stats.todayCount} vouchers</p>
         </CardContent></Card>
         <Card><CardContent className="p-3">
           <p className="text-[11px] text-muted-foreground">This Month</p>
-          <p className="text-base md:text-lg font-bold mt-0.5">{formatCurrency(stats.monthValue, settings.currency)}</p>
+          <p className="text-base md:text-lg font-bold mt-0.5">{formatCurrency(stats.monthValue, currency)}</p>
         </CardContent></Card>
         <Card><CardContent className="p-3">
           <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Banknote className="h-3 w-3" /> Total Buy</p>
-          <p className="text-base md:text-lg font-bold mt-0.5">{formatCurrency(stats.totalBuy, settings.currency)}</p>
+          <p className="text-base md:text-lg font-bold mt-0.5">{formatCurrency(stats.totalBuy, currency)}</p>
         </CardContent></Card>
         <Card><CardContent className="p-3">
           <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ArrowLeftRight className="h-3 w-3" /> Total Exchange</p>
-          <p className="text-base md:text-lg font-bold mt-0.5">{formatCurrency(stats.totalExch, settings.currency)}</p>
+          <p className="text-base md:text-lg font-bold mt-0.5">{formatCurrency(stats.totalExch, currency)}</p>
         </CardContent></Card>
       </div>
 
@@ -106,7 +152,9 @@ export function ExchangeView() {
       </Card>
 
       {/* Vouchers */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <Card><CardContent className="py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /><p className="text-sm text-muted-foreground mt-2">Loading exchange vouchers...</p></CardContent></Card>
+      ) : filtered.length === 0 ? (
         <Card><CardContent className="py-12 text-center">
           <Repeat className="h-12 w-12 mx-auto text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground mt-3">No vouchers yet</p>
@@ -134,27 +182,19 @@ export function ExchangeView() {
                         Net: <span className="font-medium tabular-nums">{ex.netWeight.toFixed(2)}g</span>
                       </span>
                       <span className="text-[11px] text-muted-foreground">
-                        Rate: <span className="font-medium tabular-nums">{formatCurrency(ex.ratePerGram, settings.currency)}/g</span>
+                        Rate: <span className="font-medium tabular-nums">{formatCurrency(ex.ratePerGram, currency)}/g</span>
                       </span>
-                      <span className="text-[11px] text-muted-foreground">{formatDate(ex.createdAt)}</span>
+                      <span className="text-[11px] text-muted-foreground">{formatDate(ex.date || ex.createdAt)}</span>
                     </div>
                   </div>
                   <div className="text-right shrink-0 flex flex-col items-end">
-                    <p className="text-base md:text-lg font-bold text-primary">{formatCurrency(ex.totalValue, settings.currency)}</p>
+                    <p className="text-base md:text-lg font-bold text-primary">{formatCurrency(ex.totalValue, currency)}</p>
                     {ex.adjustedAgainstInvoice && (
                       <p className="text-[10px] text-muted-foreground">vs {ex.adjustedAgainstInvoice}</p>
                     )}
                     {ex.paidAmount > 0 && ex.type === 'BUY' && (
-                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Paid: {formatCurrency(ex.paidAmount, settings.currency)}</p>
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Paid: {formatCurrency(ex.paidAmount, currency)}</p>
                     )}
-                    <div className="flex gap-0.5 mt-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(ex)}>
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(ex.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -166,50 +206,30 @@ export function ExchangeView() {
       <ExchangeDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        editing={editing}
-        settings={settings}
-        onSave={(data) => {
-          if (editing) {
-            updateExchange(editing.id, data)
-            toast.success('Voucher updated')
-          } else {
-            addExchange(data as Omit<OldGoldExchange, 'id' | 'voucherNo' | 'createdAt'>)
-            toast.success('Voucher created')
-          }
-          setDialogOpen(false)
-        }}
+        defaultGoldRate={defaultGoldRate}
+        currency={currency}
+        isSaving={createExchangeMutation.isPending}
+        onSave={handleSave}
       />
-
-      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this voucher?</AlertDialogTitle>
-            <AlertDialogDescription>The voucher will be removed.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
 
 function ExchangeDialog({
-  open, onOpenChange, editing, settings, onSave,
+  open, onOpenChange, defaultGoldRate, currency, isSaving, onSave,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
-  editing: OldGoldExchange | null
-  settings: ReturnType<typeof useJewelleryStore.getState>['settings']
+  defaultGoldRate: number
+  currency: string
+  isSaving: boolean
   onSave: (data: Partial<OldGoldExchange>) => void
 }) {
   const [form, setForm] = React.useState<Partial<OldGoldExchange>>({})
 
   React.useEffect(() => {
     if (open) {
-      setForm(editing ?? {
+      setForm({
         customerName: '',
         customerPhone: '',
         type: 'BUY',
@@ -218,13 +238,13 @@ function ExchangeDialog({
         netWeight: 0,
         karat: '22K',
         touch: 91.6,
-        ratePerGram: 6680,
+        ratePerGram: Math.round(defaultGoldRate * 0.916),
         totalValue: 0,
         paidAmount: 0,
         date: new Date().toISOString().slice(0, 10),
       })
     }
-  }, [open, editing])
+  }, [open, defaultGoldRate])
 
   const update = (patch: Partial<OldGoldExchange>) => setForm((f) => ({ ...f, ...patch }))
 
@@ -236,46 +256,23 @@ function ExchangeDialog({
     }
   }, [form.netWeight, form.ratePerGram, form.totalValue])
 
-  // Auto-set rate based on karat & gold rate
-  React.useEffect(() => {
-    if (form.karat && form.touch) {
-      const baseRate = settings.defaultGoldRate24K
-      // For 925 silver: use silver rate / 1000 (since rate is per kg)
-      if (form.karat === '925') {
-        const newRate = (settings.defaultSilverRate / 1000) * 0.925
-        if (Math.abs((form.ratePerGram ?? 0) - newRate) > 1) {
-          update({ ratePerGram: Math.round(newRate) })
-        }
-      } else if (form.karat === 'PT950') {
-        const newRate = 1850 // platinum rate placeholder
-        if (Math.abs((form.ratePerGram ?? 0) - newRate) > 1) {
-          update({ ratePerGram: newRate })
-        }
-      } else {
-        // gold: rate = 24K rate × touch%
-        const newRate = Math.round((baseRate * (form.touch ?? 91.6)) / 100)
-        if (Math.abs((form.ratePerGram ?? 0) - newRate) > 5) {
-          update({ ratePerGram: newRate })
-        }
-      }
-    }
-  }, [form.karat, form.touch, form.ratePerGram, settings.defaultGoldRate24K, settings.defaultSilverRate])
-
   // Auto-set touch based on karat
   const selectKarat = (k: KaratType) => {
     const touchMap: Record<KaratType, number> = {
       '24K': 99.9, '22K': 91.6, '20K': 83.3, '18K': 75, '14K': 58.5, '925': 92.5, 'PT950': 95, 'NA': 0,
     }
-    update({ karat: k, touch: touchMap[k] })
+    const touch = touchMap[k] || 91.6
+    const rate = Math.round((defaultGoldRate * touch) / 100)
+    update({ karat: k, touch, ratePerGram: rate })
   }
 
   const valid = (form.customerName?.trim()?.length ?? 0) > 0 && (form.netWeight ?? 0) > 0 && (form.itemDescription?.trim()?.length ?? 0) > 0
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => !isSaving && onOpenChange(o)}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? `Edit ${editing.voucherNo}` : 'New Exchange Voucher'}</DialogTitle>
+          <DialogTitle>New Exchange Voucher</DialogTitle>
           <DialogDescription>Record old gold buy-back or exchange</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
@@ -284,8 +281,8 @@ function ExchangeDialog({
             <Input value={form.customerName ?? ''} onChange={(e) => update({ customerName: e.target.value })} />
           </div>
           <div className="space-y-1.5">
-            <Label>Phone</Label>
-            <Input value={form.customerPhone ?? ''} onChange={(e) => update({ customerPhone: e.target.value })} placeholder="+91 ..." />
+            <Label>Phone *</Label>
+            <Input value={form.customerPhone ?? ''} onChange={(e) => update({ customerPhone: e.target.value })} placeholder="10-digit mobile number" />
           </div>
           <div className="space-y-1.5">
             <Label>Type</Label>
@@ -349,13 +346,16 @@ function ExchangeDialog({
         </div>
 
         <div className="bg-muted/40 rounded-lg p-3 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground flex items-center gap-1.5"><Gem className="h-3.5 w-3.5" /> Payable</span>
-          <span className="text-lg font-bold text-primary">{formatCurrency(form.totalValue ?? 0, settings.currency)}</span>
+          <span className="text-muted-foreground">Total Valuation</span>
+          <span className="text-lg font-bold text-primary">{formatCurrency(form.totalValue ?? 0, currency)}</span>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => valid && onSave(form)} disabled={!valid}>{editing ? 'Save Changes' : 'Create Voucher'}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
+          <Button onClick={() => valid && onSave(form)} disabled={!valid || isSaving}>
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+            Create Voucher
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

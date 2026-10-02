@@ -52,3 +52,18 @@ export function errorResponse(
     { status: statusCode }
   )
 }
+
+/**
+ * Universal API Error Handler that preserves AuthError/ApiError status codes.
+ */
+export function handleApiError(err: unknown, defaultStatus = 500): NextResponse {
+  const status = (err as any)?.statusCode || (err as any)?.status || defaultStatus
+  const message = (err as Error)?.message || 'Internal Server Error'
+  return NextResponse.json(
+    {
+      error: message,
+      code: status === 401 ? 'UNAUTHORIZED' : status === 403 ? 'FORBIDDEN' : status === 404 ? 'NOT_FOUND' : 'ERROR',
+    },
+    { status }
+  )
+}

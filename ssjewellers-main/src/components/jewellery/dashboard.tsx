@@ -7,30 +7,102 @@ import {
 } from 'recharts'
 import {
   Coins, Package, ReceiptIndianRupee, ShoppingCart, Clock, CheckCircle2, AlertTriangle,
-  Users, TrendingUp, TrendingDown, Gem, ArrowRight, Hammer, Sparkles, UserCheck,
+  Users, TrendingUp, TrendingDown, Gem, ArrowRight, Hammer, Sparkles, UserCheck, Loader2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { useJewelleryStore, formatCurrency, formatCompact, formatDate, relativeTime, isOverdue } from '@/lib/store'
-import type { ViewKey } from '@/app/page'
+import { formatCurrency, formatCompact, formatDate, relativeTime, isOverdue, type ViewKey } from '@/lib/store'
 import { StatusBadge } from './status-badge'
+import {
+  useSales,
+  usePurchases,
+  useGoldStock,
+  useProducts,
+  useCustomers,
+  useWorkOrders,
+  useSettings,
+  useAuthMe,
+} from '@/lib/hooks/use-erp-queries'
 
 interface DashboardProps {
   onNavigate: (v: ViewKey) => void
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { sales, purchases, goldStock, products, customers, workOrders, settings, currentUser, exchanges } = useJewelleryStore()
+  const { data: salesData, isLoading: loadingSales } = useSales({ limit: 50 })
+  const { data: purchasesData } = usePurchases()
+  const { data: goldData } = useGoldStock()
+  const { data: productsData } = useProducts()
+  const { data: customersData } = useCustomers()
+  const { data: workOrdersData } = useWorkOrders()
+  const { data: settingsData } = useSettings()
+  const { data: authData } = useAuthMe()
+
+  const currency = settingsData?.settings?.currency || '₹'
+  const currentUser = authData?.user
+  const goldRate24K = Number(settingsData?.settings?.defaultGoldRate24K || 7200)
+  const shopName = settingsData?.settings?.shopName || 'S.S. Jewellery'
+
+  const sales = (salesData?.sales || []).map((s: any) => ({
+    id: s.id,
+    invoiceNo: s.invoiceNo,
+    customerName: s.customerName,
+    grandTotal: Number(s.grandTotalPaise || 0) / 100,
+    dueAmount: Number(s.dueAmountPaise || 0) / 100,
+    status: s.status,
+    items: s.items || [],
+    createdAt: s.createdAt,
+  }))
+
+  const purchases = (purchasesData?.purchases || []).map((p: any) => ({
+    id: p.id,
+    grandTotal: Number(p.grandTotalPaise || 0) / 100,
+    purchaseDate: p.purchaseDate,
+  }))
+
+  const goldStock = (goldData?.goldStocks || []).map((g: any) => ({
+    id: g.id,
+    stockId: g.stockId,
+    grossWeight: Number(g.grossWeightMg || 0) / 1000,
+    fineGoldWeight: Number(g.fineGoldWeightMg || 0) / 1000,
+    purchaseValue: Number(g.purchaseValuePaise || 0) / 100,
+    status: g.status,
+  }))
+
+  const products = (productsData?.products || []).map((p: any) => ({
+    id: p.id,
+    costPrice: Number(p.costPricePaise || 0) / 100,
+    metal: p.metal || 'GOLD',
+    stock: Number(p.stock || 0),
+  }))
+
+  const customers = customersData?.customers || []
+
+  const workOrders = (workOrdersData?.workOrders || []).map((w: any) => ({
+    id: w.id,
+    workId: w.workId || w.orderNumber || w.id,
+    productName: w.productName,
+    status: w.status,
+    assignedTo: w.assignedToId,
+    assignedToName: w.assignedTo?.name,
+    expectedCompletion: w.expectedCompletion || w.targetDate,
+    grossWeight: Number(w.grossWeightMg || 0) / 1000,
+    purity: w.purity || '22K',
+    updatedAt: w.updatedAt || w.createdAt,
+    steps: (w.steps || []).map((s: any) => ({
+      stepName: s.stepName || s.name,
+      status: s.status,
+      assignedTo: s.assignedToId,
+    })),
+  }))
 
   const todayStart = React.useMemo(() => {
     const d = new Date()
     d.setHours(0, 0, 0, 0)
     return d
   }, [])
-  const last7dStart = React.useMemo(() => new Date(todayStart.getTime() - 6 * 86400000), [todayStart])
-  const last30dStart = React.useMemo(() => new Date(todayStart.getTime() - 29 * 86400000), [todayStart])
 
   const salesToday = sales.filter((s) => new Date(s.createdAt) >= todayStart)
   const purchasesToday = purchases.filter((p) => new Date(p.purchaseDate) >= todayStart)
@@ -74,10 +146,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const processSummary = React.useMemo(() => {
     const processes = ['Gold Issue', 'Melting', 'Shaping', 'Design & Cutting', 'Polishing', 'Stone Setting', 'Finishing', 'Quality Check']
     return processes.map((proc) => {
-      const matching = workOrders.filter((w) => w.steps.some((s) => s.stepName === proc))
-      const pending = matching.filter((w) => { const step = w.steps.find((s) => s.stepName === proc); return step && (step.status === 'PENDING' || step.status === 'ASSIGNED') }).length
-      const inProg = matching.filter((w) => { const step = w.steps.find((s) => s.stepName === proc); return step && step.status === 'IN_PROGRESS' }).length
-      const completed = matching.filter((w) => { const step = w.steps.find((s) => s.stepName === proc); return step && (step.status === 'COMPLETED' || step.status === 'APPROVED') }).length
+      const matching = workOrders.filter((w) => w.steps.some((s: any) => s.stepName === proc))
+      const pending = matching.filter((w) => { const step = w.steps.find((s: any) => s.stepName === proc); return step && (step.status === 'PENDING' || step.status === 'ASSIGNED') }).length
+      const inProg = matching.filter((w) => { const step = w.steps.find((s: any) => s.stepName === proc); return step && step.status === 'IN_PROGRESS' }).length
+      const completed = matching.filter((w) => { const step = w.steps.find((s: any) => s.stepName === proc); return step && (step.status === 'COMPLETED' || step.status === 'APPROVED') }).length
       return { process: proc, total: matching.length, pending, inProgress: inProg, completed }
     }).filter((p) => p.total > 0)
   }, [workOrders])
@@ -103,9 +175,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div>
             <p className="text-xs opacity-90 flex items-center gap-1.5">
               <Sparkles className="h-3 w-3" />
-              Welcome, {currentUser?.name.split(' ')[0]}
+              Welcome, {currentUser?.name?.split(' ')[0] || 'User'}
             </p>
-            <h1 className="text-xl md:text-2xl font-bold mt-1">{settings.shopName} Dashboard</h1>
+            <h1 className="text-xl md:text-2xl font-bold mt-1">{shopName} Dashboard</h1>
             <p className="text-sm opacity-90 mt-1">
               {salesToday.length} sales · {purchasesToday.length} purchases today
             </p>
@@ -114,13 +186,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div className="bg-white/15 backdrop-blur rounded-lg px-3 py-2">
               <p className="text-[10px] opacity-80 uppercase tracking-wide">Today&apos;s Gold Rate · 24K</p>
               <p className="text-lg md:text-xl font-bold">
-                ₹{settings.defaultGoldRate24K.toLocaleString('en-IN')}
+                ₹{goldRate24K.toLocaleString('en-IN')}
                 <span className="text-xs opacity-80 font-normal ml-1">/g</span>
               </p>
             </div>
-            <Button size="sm" variant="secondary" className="bg-white text-amber-900 hover:bg-white/90" onClick={() => onNavigate('sales')}>
-              <ReceiptIndianRupee className="h-4 w-4 mr-1" /> New Bill
-            </Button>
+            {isAdmin && (
+              <Button size="sm" variant="secondary" className="bg-white text-amber-900 hover:bg-white/90" onClick={() => onNavigate('sales')}>
+                <ReceiptIndianRupee className="h-4 w-4 mr-1" /> New Bill
+              </Button>
+            )}
           </div>
         </div>
         <Gem className="absolute -right-6 -bottom-6 h-32 w-32 opacity-10" />
@@ -132,8 +206,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium mb-2">Inventory</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiCard title="Total Gold Stock" value={`${totalGoldGross.toFixed(1)}g`} subtitle={`Fine: ${totalFineGold.toFixed(1)}g · ${formatCompact(goldValue, settings.currency)}`} icon={Coins} tone="primary" onClick={() => onNavigate('gold')} />
-              <KpiCard title="Finished Jewellery" value={`${finishedUnits} units`} subtitle={formatCompact(finishedStockValue, settings.currency)} icon={Package} tone="info" onClick={() => onNavigate('products')} />
+              <KpiCard title="Total Gold Stock" value={`${totalGoldGross.toFixed(1)}g`} subtitle={`Fine: ${totalFineGold.toFixed(1)}g · ${formatCompact(goldValue, currency)}`} icon={Coins} tone="primary" onClick={() => onNavigate('gold')} />
+              <KpiCard title="Finished Jewellery" value={`${finishedUnits} units`} subtitle={formatCompact(finishedStockValue, currency)} icon={Package} tone="info" onClick={() => onNavigate('products')} />
               <KpiCard title="Total Customers" value={String(customers.length)} subtitle={`${sales.length} total bills`} icon={Users} tone="success" onClick={() => onNavigate('customers')} />
               <KpiCard title="Low Stock Items" value={String(lowStock.length)} subtitle={lowStock.length > 0 ? 'Needs attention' : 'All stocked'} icon={AlertTriangle} tone="warning" onClick={() => onNavigate('products')} />
             </div>
@@ -154,9 +228,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium mb-2">Business</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiCard title="Today's Sales" value={formatCompact(totalToday, settings.currency)} subtitle={`${salesToday.length} bills`} icon={ReceiptIndianRupee} tone="success" onClick={() => onNavigate('sales')} />
-              <KpiCard title="Today's Purchase" value={formatCompact(purchaseToday, settings.currency)} subtitle={`${purchasesToday.length} orders`} icon={ShoppingCart} tone="info" onClick={() => onNavigate('purchase')} />
-              <KpiCard title="Outstanding" value={formatCompact(outstanding, settings.currency)} subtitle="Due from customers" icon={TrendingDown} tone="warning" onClick={() => onNavigate('sales')} />
+              <KpiCard title="Today's Sales" value={formatCompact(totalToday, currency)} subtitle={`${salesToday.length} bills`} icon={ReceiptIndianRupee} tone="success" onClick={() => onNavigate('sales')} />
+              <KpiCard title="Today's Purchase" value={formatCompact(purchaseToday, currency)} subtitle={`${purchasesToday.length} orders`} icon={ShoppingCart} tone="info" onClick={() => onNavigate('purchase')} />
+              <KpiCard title="Outstanding" value={formatCompact(outstanding, currency)} subtitle="Due from customers" icon={TrendingDown} tone="warning" onClick={() => onNavigate('sales')} />
               <KpiCard title="Completed Work" value={String(completedWork.length)} subtitle="Finished jewellery" icon={CheckCircle2} tone="success" onClick={() => onNavigate('workflow')} />
             </div>
           </div>
@@ -165,7 +239,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       {/* Staff dashboard — only their assigned work */}
       {!isAdmin && (
-        <StaffWorkSummary onNavigate={onNavigate} />
+        <StaffWorkSummary workOrders={workOrders} currentUser={currentUser} onNavigate={onNavigate} />
       )}
 
       {/* Charts row */}
@@ -178,7 +252,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <CardTitle className="text-base">Sales — Last 14 Days</CardTitle>
                   <CardDescription className="text-xs">Daily revenue trend</CardDescription>
                 </div>
-                <Badge variant="outline" className="text-xs">{formatCompact(chartData.reduce((s, d) => s + d.total, 0), settings.currency)}</Badge>
+                <Badge variant="outline" className="text-xs">{formatCompact(chartData.reduce((s, d) => s + d.total, 0), currency)}</Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -194,7 +268,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} interval={1} />
                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickFormatter={(v) => formatCompact(v, '')} />
-                    <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', color: 'var(--popover-foreground)' }} formatter={(v: number) => [formatCurrency(v, settings.currency), 'Revenue']} />
+                    <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', color: 'var(--popover-foreground)' }} formatter={(v: number) => [formatCurrency(v, currency), 'Revenue']} />
                     <Area type="monotone" dataKey="total" stroke="var(--chart-1)" strokeWidth={2} fill="url(#salesGrad)" />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -214,7 +288,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <Pie data={metalMix} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={75} paddingAngle={2} stroke="var(--background)" strokeWidth={2}>
                       {metalMix.map((e, i) => <Cell key={i} fill={e.color} />)}
                     </Pie>
-                    <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', color: 'var(--popover-foreground)' }} formatter={(v: number, n) => [formatCurrency(v, settings.currency), n]} />
+                    <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', color: 'var(--popover-foreground)' }} formatter={(v: number, n) => [formatCurrency(v, currency), n]} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -225,7 +299,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: m.color }} />
                       <span className="font-medium">{m.name}</span>
                     </div>
-                    <span className="text-muted-foreground">{formatCompact(m.value, settings.currency)}</span>
+                    <span className="text-muted-foreground">{formatCompact(m.value, currency)}</span>
                   </div>
                 ))}
               </div>
@@ -293,7 +367,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         <p className="text-[11px] text-muted-foreground">{s.invoiceNo} · {relativeTime(s.createdAt)}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-semibold">{formatCurrency(s.grandTotal, settings.currency)}</p>
+                        <p className="text-sm font-semibold">{formatCurrency(s.grandTotal, currency)}</p>
                         <p className="text-[11px] text-muted-foreground">{s.items.length} items</p>
                       </div>
                     </div>
@@ -338,8 +412,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   )
 }
 
-function StaffWorkSummary({ onNavigate }: { onNavigate: (v: ViewKey) => void }) {
-  const { workOrders, currentUser } = useJewelleryStore()
+function StaffWorkSummary({ workOrders, currentUser, onNavigate }: {
+  workOrders: any[]
+  currentUser: any
+  onNavigate: (v: ViewKey) => void
+}) {
   const myWork = workOrders.filter((w) => w.assignedTo === currentUser?.id)
   const pending = myWork.filter((w) => w.status === 'PENDING' || w.status === 'ASSIGNED')
   const inProgress = myWork.filter((w) => w.status === 'IN_PROGRESS')

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
-import { requirePermission } from '@/lib/auth/guards'
+import { requirePermission, requireAuth } from '@/lib/auth/guards'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 
 // GET /api/audit-logs - List audit logs
@@ -50,6 +50,32 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Failed to fetch audit logs', 500)
+    const status = (err as any)?.statusCode || 500
+    return errorResponse((err as Error).message || 'Failed to fetch audit logs', status)
+  }
+}
+
+// POST /api/audit-logs - Record custom audit log
+export async function POST(request: NextRequest) {
+  try {
+    const user = await requireAuth()
+    const body = await request.json()
+    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+
+    const log = await db.auditLog.create({
+      data: {
+        userId: user.id,
+        userName: user.name,
+        action: body.action || 'LOG',
+        entity: body.entity || 'System',
+        entityId: body.entityId || null,
+        details: body.details || '',
+        ipAddress,
+      },
+    })
+
+    return jsonResponse({ success: true, auditLog: log }, { status: 201 })
+  } catch (err: unknown) {
+    return errorResponse((err as Error).message || 'Failed to record audit log', 400)
   }
 }

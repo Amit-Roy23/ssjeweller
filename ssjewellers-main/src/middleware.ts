@@ -49,12 +49,34 @@ export async function middleware(request: NextRequest) {
         )
       }
 
+      // If user must change password, strictly block access to all API routes except change-password, me, and logout
+      if (Boolean(payload.mustChangePassword)) {
+        const allowedWhenMustChange = [
+          '/api/auth/change-password',
+          '/api/auth/me',
+          '/api/auth/logout',
+        ]
+        const isAllowed = allowedWhenMustChange.some(
+          (path) => pathname === path || pathname.startsWith(`${path}/`)
+        )
+        if (!isAllowed) {
+          return NextResponse.json(
+            {
+              error: 'Password change required before accessing other resources.',
+              code: 'MUST_CHANGE_PASSWORD',
+            },
+            { status: 403 }
+          )
+        }
+      }
+
       // Attach verified user claims to request headers for downstream server components / handlers
       const requestHeaders = new Headers(request.headers)
       requestHeaders.set('x-user-id', payload.sub as string)
       requestHeaders.set('x-user-role', (payload.role as string) || 'STAFF')
       requestHeaders.set('x-user-name', (payload.name as string) || '')
       requestHeaders.set('x-user-username', (payload.username as string) || '')
+      requestHeaders.set('x-user-must-change-password', String(Boolean(payload.mustChangePassword)))
 
       return NextResponse.next({
         request: {

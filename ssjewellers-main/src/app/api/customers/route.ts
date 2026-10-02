@@ -8,14 +8,14 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 const createCustomerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(10, 'Valid 10-digit phone number is required'),
-  email: z.string().email('Invalid email').optional().nullable(),
-  address: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  pincode: z.string().optional().nullable(),
-  gstin: z.string().optional().nullable(),
-  pan: z.string().optional().nullable(),
-  dateOfBirth: z.string().optional().transform((v) => (v ? new Date(v) : null)),
-  anniversary: z.string().optional().transform((v) => (v ? new Date(v) : null)),
+  email: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  address: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  city: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  pincode: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  gstin: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  pan: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  dateOfBirth: z.string().optional().nullable().transform((v) => (v && v.trim() ? new Date(v) : null)),
+  anniversary: z.string().optional().nullable().transform((v) => (v && v.trim() ? new Date(v) : null)),
 })
 
 // GET /api/customers - List customers

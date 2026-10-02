@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useJewelleryStore } from '@/lib/store'
+import { queryKeys } from '@/lib/hooks/use-erp-queries'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 interface LoginPageProps {
@@ -15,7 +17,8 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLoggedIn }: LoginPageProps) {
-  const login = useJewelleryStore((s) => s.login)
+  const queryClient = useQueryClient()
+  const setCurrentUser = useJewelleryStore((s) => s.setCurrentUser)
   const [username, setUsername] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [showPwd, setShowPwd] = React.useState(false)
@@ -42,8 +45,9 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
       const data = await res.json()
 
       if (res.ok && data.success && data.user) {
-        // Sync user into store
-        login(username.trim(), password)
+        // Sync verified server user into client store and React Query cache
+        queryClient.setQueryData(queryKeys.auth.me(), { user: data.user, permissions: [] })
+        setCurrentUser(data.user)
         toast.success(`Welcome back, ${data.user.name.split(' ')[0]}!`)
         onLoggedIn()
         return

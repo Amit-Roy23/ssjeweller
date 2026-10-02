@@ -14,87 +14,66 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useJewelleryStore, formatCurrency, formatDate, formatCompact } from '@/lib/store'
+import { formatCurrency, formatDate, formatCompact } from '@/lib/store'
+import {
+  useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer,
+  useSettings, useSales,
+} from '@/lib/hooks/use-erp-queries'
 import type { Customer } from '@/lib/types'
 import { toast } from 'sonner'
 
 export function CustomersView() {
-  const { sales, settings, setCustomers: storeSetCustomers } = useJewelleryStore()
-  const storeCustomers = useJewelleryStore((s) => s.customers)
-  const [customers, setCustomers] = React.useState<Customer[]>(storeCustomers)
-  const [loading, setLoading] = React.useState(false)
+  const { data: customerData, isLoading: loading, refetch: loadCustomers } = useCustomers()
+  const { data: settingsData } = useSettings()
+  const { data: salesData } = useSales({ limit: 100 })
+
+  const createCustomerMutation = useCreateCustomer()
+  const updateCustomerMutation = useUpdateCustomer()
+  const deleteCustomerMutation = useDeleteCustomer()
+
+  const currency = settingsData?.settings?.currency || '₹'
+  const sales = (salesData?.sales || []) as any[]
+
+  const customers: Customer[] = (customerData?.customers || []).map((c: any) => ({
+    id: c.id,
+    customerId: c.customerId,
+    name: c.name,
+    phone: c.phone,
+    email: c.email || undefined,
+    address: c.address || undefined,
+    city: c.city || undefined,
+    pincode: c.pincode || undefined,
+    gstin: c.gstin || undefined,
+    pan: c.pan || undefined,
+    dateOfBirth: c.dateOfBirth ? String(c.dateOfBirth) : undefined,
+    anniversary: c.anniversary ? String(c.anniversary) : undefined,
+    totalPurchase: Number(c.totalPurchasePaise || 0) / 100,
+    totalPaid: Number(c.totalPaidPaise || 0) / 100,
+    totalDue: Number(c.totalDuePaise || 0) / 100,
+    totalBills: Number(c.totalBills || 0),
+    createdAt: c.createdAt,
+  }))
+
   const [search, setSearch] = React.useState('')
   const [editing, setEditing] = React.useState<Customer | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
   const [viewC, setViewC] = React.useState<Customer | null>(null)
 
-  // Fetch customers directly from Next.js API / Supabase DB
-  const loadCustomers = React.useCallback(async () => {
-    try {
-      setLoading(true)
-      const res = await fetch('/api/customers')
-      if (res.ok) {
-        const data = await res.json()
-        if (data.customers) {
-          const mapped: Customer[] = data.customers.map((c: any) => ({
-            id: c.id,
-            customerId: c.customerId,
-            name: c.name,
-            phone: c.phone,
-            email: c.email || undefined,
-            address: c.address || undefined,
-            city: c.city || undefined,
-            pincode: c.pincode || undefined,
-            gstin: c.gstin || undefined,
-            pan: c.pan || undefined,
-            dateOfBirth: c.dateOfBirth ? String(c.dateOfBirth) : undefined,
-            anniversary: c.anniversary ? String(c.anniversary) : undefined,
-            totalPurchase: Number(c.totalPurchasePaise || 0) / 100,
-            totalPaid: Number(c.totalPaidPaise || 0) / 100,
-            totalDue: Number(c.totalDuePaise || 0) / 100,
-            totalBills: Number(c.totalBills || 0),
-            createdAt: c.createdAt,
-          }))
-          setCustomers(mapped)
-          if (storeSetCustomers) storeSetCustomers(mapped)
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load customers from API:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [storeSetCustomers])
-
-  React.useEffect(() => {
-    loadCustomers()
-  }, [loadCustomers])
+  const isSaving = createCustomerMutation.isPending || updateCustomerMutation.isPending
+  const isDeleting = deleteCustomerMutation.isPending
 
   const handleSave = async (data: Partial<Customer>) => {
     try {
       if (editing) {
-        const res = await fetch(`/api/customers/${editing.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        })
-        const resData = await res.json()
-        if (!res.ok) throw new Error(resData.error || 'Failed to update customer')
-        toast.success('Customer updated successfully in database')
+        await updateCustomerMutation.mutateAsync({ id: editing.id, data })
+        toast.success('Customer updated successfully')
       } else {
-        const res = await fetch('/api/customers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        })
-        const resData = await res.json()
-        if (!res.ok) throw new Error(resData.error || 'Failed to create customer')
-        toast.success(`Customer ${resData.customer?.name} created successfully in Supabase`)
+        const res = await createCustomerMutation.mutateAsync(data)
+        toast.success(`Customer ${res.customer?.name} created successfully`)
       }
       setDialogOpen(false)
       setEditing(null)
-      await loadCustomers()
     } catch (err: any) {
       toast.error(err.message || 'Error saving customer')
     }
@@ -102,14 +81,9 @@ export function CustomersView() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
-      if (!res.ok) {
-        const resData = await res.json()
-        throw new Error(resData.error || 'Failed to delete customer')
-      }
-      toast.success('Customer removed')
+      await deleteCustomerMutation.mutateAsync(id)
+      toast.success('Customer removed successfully')
       setDeleteId(null)
-      await loadCustomers()
     } catch (err: any) {
       toast.error(err.message || 'Error deleting customer')
     }
@@ -130,11 +104,11 @@ export function CustomersView() {
             <Users className="h-5 w-5 text-primary" /> Customers
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {customers.length} customers · {formatCompact(customers.reduce((s, c) => s + c.totalPurchase, 0), settings.currency)} lifetime value
+            {customers.length} customers · {formatCompact(customers.reduce((s, c) => s + c.totalPurchase, 0), currency)} lifetime value
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={loadCustomers} disabled={loading} title="Refresh from database">
+          <Button variant="outline" size="icon" onClick={() => loadCustomers()} disabled={loading} title="Refresh from database">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           <Button onClick={() => { setEditing(null); setDialogOpen(true) }}>
@@ -153,7 +127,7 @@ export function CustomersView() {
                   <div className="h-8 w-8 rounded-full bg-gold-gradient text-white text-xs font-bold flex items-center justify-center shrink-0">#{idx + 1}</div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{c.name}</p>
-                    <p className="text-[11px] text-muted-foreground">{formatCompact(c.totalPurchase, settings.currency)} · {c.totalBills} bills</p>
+                    <p className="text-[11px] text-muted-foreground">{formatCompact(c.totalPurchase, currency)} · {c.totalBills} bills</p>
                   </div>
                 </div>
               ))}
@@ -204,12 +178,12 @@ export function CustomersView() {
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
                       <div>
                         <p className="text-[10px] text-muted-foreground">Total Purchase</p>
-                        <p className="text-sm font-semibold">{formatCompact(c.totalPurchase, settings.currency)}</p>
+                        <p className="text-sm font-semibold">{formatCompact(c.totalPurchase, currency)}</p>
                       </div>
                       {c.totalDue > 0 ? (
                         <div className="text-right">
                           <p className="text-[10px] text-muted-foreground">Due</p>
-                          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">{formatCompact(c.totalDue, settings.currency)}</p>
+                          <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">{formatCompact(c.totalDue, currency)}</p>
                         </div>
                       ) : (
                         <Badge variant="secondary" className="text-[10px]"><ShoppingBag className="h-2.5 w-2.5 mr-1" />{c.totalBills} bills</Badge>
@@ -223,23 +197,23 @@ export function CustomersView() {
         </div>
       )}
 
-      <CustomerDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} onSave={handleSave} />
+      <CustomerDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} onSave={handleSave} isSaving={isSaving} />
 
       <Dialog open={!!viewC} onOpenChange={(o) => !o && setViewC(null)}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           {viewC && (() => {
-            const customerSales = sales.filter((s) => s.customerId === viewC.id)
-            const salesGram = customerSales.reduce((acc, s) => acc + s.items.reduce((sum, it) => sum + (it.netWeight || it.grossWeight || 0) * it.quantity, 0), 0)
-            const fallbackRate = settings.defaultGoldRate24K || 7250
+            const customerSales = sales.filter((s) => s.customerId === viewC.id || s.customer?.id === viewC.id)
+            const salesGram = customerSales.reduce((acc, s) => acc + (s.items || []).reduce((sum: number, it: any) => sum + (Number(it.netWeightMg || it.grossWeightMg || 0) / 1000) * (it.quantity || 1), 0), 0)
+            const fallbackRate = Number(settingsData?.settings?.defaultGoldRate24KPaise || 725000) / 100
             const totalPurchaseGrams = salesGram > 0 ? salesGram : (viewC.totalPurchase > 0 ? viewC.totalPurchase / fallbackRate : 0)
 
-            const totalGrand = customerSales.reduce((acc, s) => acc + s.grandTotal, 0)
-            const totalPaidAmount = customerSales.reduce((acc, s) => acc + s.paidAmount, 0)
+            const totalGrand = customerSales.reduce((acc, s) => acc + Number(s.grandTotalPaise || 0) / 100, 0)
+            const totalPaidAmount = customerSales.reduce((acc, s) => acc + Number(s.paidAmountPaise || 0) / 100, 0)
             const paidRatio = totalGrand > 0 ? (totalPaidAmount / totalGrand) : (viewC.totalPurchase > 0 ? (viewC.totalPaid / viewC.totalPurchase) : 1)
             const paidGrams = totalPurchaseGrams * Math.min(1, Math.max(0, paidRatio))
             const dueGrams = Math.max(0, totalPurchaseGrams - paidGrams)
 
-            const totalMakingCharges = customerSales.reduce((acc, s) => acc + (s.totalMaking || s.items.reduce((m, it) => m + (it.makingAmount || 0) * it.quantity, 0)), 0)
+            const totalMakingCharges = customerSales.reduce((acc, s) => acc + (Number(s.totalMakingPaise || 0) / 100), 0)
 
             return (
               <>
@@ -267,7 +241,7 @@ export function CustomersView() {
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-muted/40 rounded-lg p-2 col-span-1">
                           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Making Charges</p>
-                          <p className="text-sm font-bold text-primary tabular-nums">{formatCurrency(totalMakingCharges, settings.currency)}</p>
+                          <p className="text-sm font-bold text-primary tabular-nums">{formatCurrency(totalMakingCharges, currency)}</p>
                         </div>
                       </div>
                     )}
@@ -281,15 +255,15 @@ export function CustomersView() {
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Recent Bills</p>
-                    {customerSales.slice(0, 5).map((s) => (
+                    {customerSales.slice(0, 5).map((s: any) => (
                       <div key={s.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0 text-sm">
                         <div>
                           <p className="font-medium">{s.invoiceNo}</p>
                           <p className="text-[11px] text-muted-foreground">
-                            {formatDate(s.createdAt)} · {s.items.reduce((sum, it) => sum + (it.netWeight || it.grossWeight || 0) * it.quantity, 0).toFixed(2)}g
+                            {formatDate(s.createdAt)} · {(s.items || []).reduce((sum: number, it: any) => sum + (Number(it.netWeightMg || it.grossWeightMg || 0) / 1000) * (it.quantity || 1), 0).toFixed(2)}g
                           </p>
                         </div>
-                        <span className="font-semibold tabular-nums">{formatCurrency(s.grandTotal, settings.currency)}</span>
+                        <span className="font-semibold tabular-nums">{formatCurrency(Number(s.grandTotalPaise || 0) / 100, currency)}</span>
                       </div>
                     ))}
                     {customerSales.length === 0 && <p className="text-xs text-muted-foreground py-2">No bills yet</p>}
@@ -309,8 +283,12 @@ export function CustomersView() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+            <AlertDialogAction
+              onClick={() => deleteId && handleDelete(deleteId)}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -319,11 +297,12 @@ export function CustomersView() {
   )
 }
 
-function CustomerDialog({ open, onOpenChange, editing, onSave }: {
+function CustomerDialog({ open, onOpenChange, editing, onSave, isSaving }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   editing: Customer | null
   onSave: (data: Partial<Customer>) => void
+  isSaving?: boolean
 }) {
   const [form, setForm] = React.useState<Partial<Customer>>({})
 
@@ -352,7 +331,9 @@ function CustomerDialog({ open, onOpenChange, editing, onSave }: {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => valid && onSave(form)} disabled={!valid}>{editing ? 'Save Changes' : 'Add Customer'}</Button>
+          <Button onClick={() => valid && onSave(form)} disabled={!valid || isSaving}>
+            {isSaving ? 'Saving...' : editing ? 'Save Changes' : 'Add Customer'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

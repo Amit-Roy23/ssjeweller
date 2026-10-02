@@ -5,7 +5,10 @@ import { SalesService } from '@/lib/services/sales.service'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 
 const cancelSchema = z.object({
-  cancelReason: z.string().min(3, 'Cancellation reason is required (min 3 characters)'),
+  cancelReason: z.string().optional(),
+  reason: z.string().optional(),
+}).refine((data) => (data.cancelReason || data.reason || '').trim().length >= 3, {
+  message: 'Cancellation reason is required (min 3 characters)',
 })
 
 interface RouteParams {
@@ -25,12 +28,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const reason = (parsed.data.cancelReason || parsed.data.reason || 'Cancelled').trim()
 
     const cancelledSale = await SalesService.cancelSale({
       saleId: id,
       cancelledById: user.id,
       cancelledByName: user.name,
-      cancelReason: parsed.data.cancelReason,
+      cancelReason: reason,
       ipAddress,
     })
 

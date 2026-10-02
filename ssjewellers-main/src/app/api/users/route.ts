@@ -42,10 +42,10 @@ export async function GET() {
 
     return NextResponse.json({ users })
   } catch (err: unknown) {
-    console.error('List users error:', err)
+    const status = (err as any)?.statusCode || 500
     return NextResponse.json(
       { error: (err as Error).message || 'Failed to list users' },
-      { status: 500 }
+      { status }
     )
   }
 }

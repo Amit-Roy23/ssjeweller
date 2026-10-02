@@ -8,14 +8,14 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 const updateCustomerSchema = z.object({
   name: z.string().min(1, 'Name is required').optional(),
   phone: z.string().min(10, 'Valid 10-digit phone number is required').optional(),
-  email: z.string().email('Invalid email').optional().nullable(),
-  address: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  pincode: z.string().optional().nullable(),
-  gstin: z.string().optional().nullable(),
-  pan: z.string().optional().nullable(),
-  dateOfBirth: z.string().optional().transform((v) => (v ? new Date(v) : null)),
-  anniversary: z.string().optional().transform((v) => (v ? new Date(v) : null)),
+  email: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  address: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  city: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  pincode: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  gstin: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  pan: z.string().optional().nullable().transform((v) => (v && v.trim() ? v.trim() : null)),
+  dateOfBirth: z.string().optional().nullable().transform((v) => (v && v.trim() ? new Date(v) : null)),
+  anniversary: z.string().optional().nullable().transform((v) => (v && v.trim() ? new Date(v) : null)),
 })
 
 interface RouteParams {
@@ -69,5 +69,35 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return jsonResponse({ success: true, customer })
   } catch (err: unknown) {
     return errorResponse((err as Error).message || 'Failed to update customer', 400)
+  }
+}
+
+// DELETE /api/customers/[id] - Delete customer
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    const user = await requirePermission('customers:write')
+    const { id } = await params
+    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+
+    const existing = await db.customer.findUnique({ where: { id } })
+    if (!existing) return errorResponse('Customer not found', 404)
+
+    await db.customer.delete({ where: { id } })
+
+    await db.auditLog.create({
+      data: {
+        userId: user.id,
+        userName: user.name,
+        action: 'DELETE_CUSTOMER',
+        entity: 'Customer',
+        entityId: id,
+        details: `Deleted customer ${existing.name}`,
+        ipAddress,
+      },
+    })
+
+    return jsonResponse({ success: true, message: 'Customer deleted successfully' })
+  } catch (err: unknown) {
+    return errorResponse((err as Error).message || 'Failed to delete customer', 400)
   }
 }

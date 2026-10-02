@@ -14,12 +14,15 @@ export class AuthError extends Error {
 }
 
 /**
- * Ensures a request is authenticated. Returns the authenticated user or throws AuthError(401).
+ * Ensures a request is authenticated. Returns the authenticated user or throws AuthError(401/403).
  */
-export async function requireAuth(): Promise<AuthSessionUser> {
+export async function requireAuth(options?: { allowMustChangePassword?: boolean }): Promise<AuthSessionUser> {
   const user = await getSessionUser()
   if (!user) {
     throw new AuthError('Authentication required. Please log in.', 401)
+  }
+  if (user.mustChangePassword && !options?.allowMustChangePassword) {
+    throw new AuthError('Password change required before accessing other resources.', 403)
   }
   return user
 }
@@ -27,8 +30,8 @@ export async function requireAuth(): Promise<AuthSessionUser> {
 /**
  * Ensures the authenticated user has one of the allowed roles.
  */
-export async function requireRole(allowedRoles: UserRole[]): Promise<AuthSessionUser> {
-  const user = await requireAuth()
+export async function requireRole(allowedRoles: UserRole[], options?: { allowMustChangePassword?: boolean }): Promise<AuthSessionUser> {
+  const user = await requireAuth(options)
   if (!allowedRoles.includes(user.role)) {
     throw new AuthError(
       `Access denied. Required role: ${allowedRoles.join(' or ')}. Your role: ${user.role}`,
@@ -41,8 +44,8 @@ export async function requireRole(allowedRoles: UserRole[]): Promise<AuthSession
 /**
  * Ensures the authenticated user has a specific permission.
  */
-export async function requirePermission(permission: Permission): Promise<AuthSessionUser> {
-  const user = await requireAuth()
+export async function requirePermission(permission: Permission, options?: { allowMustChangePassword?: boolean }): Promise<AuthSessionUser> {
+  const user = await requireAuth(options)
   if (!hasPermission(user.role, permission)) {
     throw new AuthError(
       `Access denied. You do not have permission to perform '${permission}'.`,

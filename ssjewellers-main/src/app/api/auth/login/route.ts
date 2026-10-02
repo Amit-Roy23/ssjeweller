@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!user) {
+      console.log(`[AUTH_LOGIN_DECISION] reason=user_not_found username=${username.toLowerCase()}`)
       // Record failed attempt audit
       await db.auditLog.create({
         data: {
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
 
     // Check if account is active
     if (!user.active) {
+      console.log(`[AUTH_LOGIN_DECISION] reason=inactive username=${user.username}`)
       await db.auditLog.create({
         data: {
           userId: user.id,
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     // Check if account is temporarily locked
     if (user.lockedUntil && user.lockedUntil > new Date()) {
+      console.log(`[AUTH_LOGIN_DECISION] reason=locked username=${user.username}`)
       const waitMinutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000)
       return NextResponse.json(
         {
@@ -82,6 +85,7 @@ export async function POST(request: NextRequest) {
     const isPasswordValid = await verifyPassword(password, user.passwordHash)
 
     if (!isPasswordValid) {
+      console.log(`[AUTH_LOGIN_DECISION] reason=wrong_password username=${user.username}`)
       const failedAttempts = user.failedLoginAttempts + 1
       const lockAccount = failedAttempts >= 5
       const lockedUntil = lockAccount ? new Date(Date.now() + 15 * 60 * 1000) : null // 15 min lockout
@@ -119,6 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Password is valid - reset failed attempts and update last login
+    console.log(`[AUTH_LOGIN_DECISION] reason=ok username=${user.username}`)
     await db.user.update({
       where: { id: user.id },
       data: {
@@ -154,7 +159,6 @@ export async function POST(request: NextRequest) {
 
     // Generate JWT token
     const token = await createSessionToken(safeUser)
-    const cookieOptions = getSessionCookieOptions()
 
     const response = NextResponse.json({
       success: true,
@@ -162,16 +166,19 @@ export async function POST(request: NextRequest) {
       token,
     })
 
-    response.cookies.set({
-      ...cookieOptions,
-      value: token,
+    response.cookies.set('ssj_session', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
     })
 
     return response
   } catch (err: unknown) {
-    console.error('Login error:', err)
+    console.error('Login error:', (err as Error)?.message || err, (err as Error)?.stack)
     return NextResponse.json(
-      { error: 'An unexpected error occurred during login. Please try again.' },
+      { error: (err as Error)?.message || 'An unexpected error occurred during login. Please try again.' },
       { status: 500 }
     )
   }

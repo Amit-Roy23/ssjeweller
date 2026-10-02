@@ -123,7 +123,7 @@ All state mutations in the current system occur directly on the client in [`src/
 - **Location**: [`src/components/jewellery/login-page.tsx:17-22`](file:///c:/AROHON%20FILES/ssjewellers-main/ssjewellers-main/src/components/jewellery/login-page.tsx#L17-L22), [`src/components/jewellery/users.tsx:163`](file:///c:/AROHON%20FILES/ssjewellers-main/ssjewellers-main/src/components/jewellery/users.tsx#L163)
 - **Impact**: Critical / Security Vulnerability.
 - **Description**:
-  - Demo accounts with plaintext passwords (`admin123`, `manager123`) are hardcoded into the client bundle.
+  - Legacy demo accounts previously hardcoded plaintext passwords into the client bundle.
   - User creation in `users.tsx` exposes the password in an `<Input type="text">` plaintext field.
   - Authentication checks occur on the browser by querying `get().users.find(...)`. Anyone opening DevTools can read or modify any user credentials and permissions.
 

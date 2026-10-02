@@ -12,7 +12,7 @@ const changePasswordSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const sessionUser = await requireAuth()
+    const sessionUser = await requireAuth({ allowMustChangePassword: true })
     const body = await request.json()
     const parsed = changePasswordSchema.safeParse(body)
 

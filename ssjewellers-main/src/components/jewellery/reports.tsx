@@ -5,15 +5,114 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
   LineChart, Line, PieChart, Pie,
 } from 'recharts'
-import { BarChart3, TrendingUp, Coins, Hammer, ReceiptIndianRupee, Download, Users as UsersIcon, ShoppingCart } from 'lucide-react'
+import { BarChart3, TrendingUp, Coins, Hammer, ReceiptIndianRupee, Download, Users as UsersIcon, ShoppingCart, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useJewelleryStore, formatCurrency, formatCompact, formatDate, isOverdue } from '@/lib/store'
+import { formatCurrency, formatCompact, formatDate, isOverdue } from '@/lib/store'
+import {
+  useSales,
+  usePurchases,
+  useGoldStock,
+  useProducts,
+  useWorkOrders,
+  useUsers,
+  useWastageRecords,
+  useSettings,
+  useFinancialOverview,
+} from '@/lib/hooks/use-erp-queries'
 
 export function ReportsView() {
-  const { sales, purchases, goldStock, products, workOrders, users, customers, wastageRecords, settings } = useJewelleryStore()
+  const { data: salesData, isLoading: loadingSales } = useSales({ limit: 100 })
+  const { data: purchasesData } = usePurchases()
+  const { data: goldData } = useGoldStock()
+  const { data: productsData } = useProducts()
+  const { data: workOrdersData } = useWorkOrders()
+  const { data: usersData } = useUsers()
+  const { data: wastagesData } = useWastageRecords()
+  const { data: settingsData } = useSettings()
+  const { data: overviewData } = useFinancialOverview()
+
+  const currency = settingsData?.settings?.currency || '₹'
+
+  const sales = (salesData?.sales || []).map((s: any) => ({
+    id: s.id,
+    invoiceNo: s.invoiceNo,
+    customerName: s.customerName,
+    customerPhone: s.customerPhone,
+    subtotal: Number(s.subtotalPaise || 0) / 100,
+    totalGst: Number(s.totalGstPaise || 0) / 100,
+    grandTotal: Number(s.grandTotalPaise || 0) / 100,
+    paidAmount: Number(s.paidAmountPaise || 0) / 100,
+    dueAmount: Number(s.dueAmountPaise || 0) / 100,
+    status: s.status,
+    paymentMode: s.paymentMode,
+    createdAt: s.createdAt,
+  }))
+
+  const purchases = (purchasesData?.purchases || []).map((p: any) => ({
+    id: p.id,
+    purchaseId: p.purchaseNumber || p.id,
+    grandTotal: Number(p.grandTotalPaise || 0) / 100,
+    purchaseDate: p.purchaseDate,
+  }))
+
+  const goldStock = (goldData?.goldStocks || []).map((g: any) => ({
+    id: g.id,
+    stockId: g.stockId,
+    materialType: g.materialType,
+    purity: g.purity,
+    grossWeight: Number(g.grossWeightMg || 0) / 1000,
+    fineGoldWeight: Number(g.fineGoldWeightMg || 0) / 1000,
+    purchaseValue: Number(g.purchaseValuePaise || 0) / 100,
+    supplierName: g.supplier?.name,
+    purchaseDate: g.purchaseDate,
+    status: g.status,
+    currentLocation: g.currentLocation,
+  }))
+
+  const products = (productsData?.products || []).map((p: any) => ({
+    id: p.id,
+    costPrice: Number(p.costPricePaise || 0) / 100,
+    stock: Number(p.stock || 0),
+  }))
+
+  const workOrders = (workOrdersData?.workOrders || []).map((w: any) => ({
+    id: w.id,
+    workId: w.workId || w.orderNumber || w.id,
+    productName: w.productName,
+    status: w.status,
+    priority: w.priority,
+    assignedTo: w.assignedToId,
+    assignedToName: w.assignedTo?.name,
+    startDate: w.startDate || w.createdAt,
+    expectedCompletion: w.expectedCompletion || w.targetDate,
+    grossWeight: Number(w.grossWeightMg || 0) / 1000,
+    purity: w.purity,
+    steps: (w.steps || []).map((s: any) => ({
+      assignedTo: s.assignedToId,
+      status: s.status,
+    })),
+  }))
+
+  const users = (usersData?.users || []).map((u: any) => ({
+    id: u.id,
+    name: u.name,
+    username: u.username,
+    role: u.role,
+    specialty: u.specialty,
+    active: u.active,
+  }))
+
+  const wastageRecords = (wastagesData?.wastages || []).map((w: any) => ({
+    id: w.id,
+    stepName: w.stepName || 'Production',
+    inputWeight: Number(w.inputWeightMg || 0) / 1000,
+    outputWeight: Number(w.outputWeightMg || 0) / 1000,
+    wastageWeight: Number(w.wastageMg || 0) / 1000,
+    date: w.createdAt,
+  }))
 
   // Monthly sales (6 months)
   const monthlySales = React.useMemo(() => {
@@ -106,21 +205,21 @@ export function ReportsView() {
             <Button variant="outline" size="sm" onClick={handleExportSales}><Download className="h-4 w-4 mr-1.5" /> Export Sales CSV</Button>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Total Sales (6mo)</p><p className="text-base md:text-lg font-bold mt-0.5">{formatCompact(monthlySales.reduce((s, m) => s + m.total, 0), settings.currency)}</p></CardContent></Card>
+            <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Total Sales (6mo)</p><p className="text-base md:text-lg font-bold mt-0.5">{formatCompact(monthlySales.reduce((s, m) => s + m.total, 0), currency)}</p></CardContent></Card>
             <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Total Bills (6mo)</p><p className="text-base md:text-lg font-bold mt-0.5">{monthlySales.reduce((s, m) => s + m.bills, 0)}</p></CardContent></Card>
-            <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Avg Bill Value</p><p className="text-base md:text-lg font-bold mt-0.5">{formatCompact(monthlySales.reduce((s, m) => s + m.total, 0) / Math.max(1, monthlySales.reduce((s, m) => s + m.bills, 0)), settings.currency)}</p></CardContent></Card>
-            <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Outstanding</p><p className="text-base md:text-lg font-bold mt-0.5 text-rose-600 dark:text-rose-400">{formatCompact(sales.reduce((s, x) => s + x.dueAmount, 0), settings.currency)}</p></CardContent></Card>
+            <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Avg Bill Value</p><p className="text-base md:text-lg font-bold mt-0.5">{formatCompact(monthlySales.reduce((s, m) => s + m.total, 0) / Math.max(1, monthlySales.reduce((s, m) => s + m.bills, 0)), currency)}</p></CardContent></Card>
+            <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Outstanding</p><p className="text-base md:text-lg font-bold mt-0.5 text-rose-600 dark:text-rose-400">{formatCompact(sales.reduce((s, x) => s + x.dueAmount, 0), currency)}</p></CardContent></Card>
           </div>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-base">Monthly Sales vs Purchase</CardTitle><CardDescription className="text-xs">6-month comparison</CardDescription></CardHeader>
             <CardContent>
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlySales.map((m, i) => ({ label: m.label, sales: m.total, purchase: monthlyPurchases[i].total }))} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                  <BarChart data={monthlySales.map((m, i) => ({ label: m.label, sales: m.total, purchase: monthlyPurchases[i]?.total || 0 }))} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickFormatter={(v) => formatCompact(v, '')} />
-                    <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', color: 'var(--popover-foreground)' }} formatter={(v: number, n) => [formatCurrency(v, settings.currency), n === 'sales' ? 'Sales' : 'Purchase']} />
+                    <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px', color: 'var(--popover-foreground)' }} formatter={(v: number, n) => [formatCurrency(v, currency), n === 'sales' ? 'Sales' : 'Purchase']} />
                     <Bar dataKey="sales" name="sales" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="purchase" name="purchase" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -138,7 +237,7 @@ export function ReportsView() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Total Gold (Gross)</p><p className="text-base md:text-lg font-bold mt-0.5">{goldStock.filter((g) => g.status === 'AVAILABLE').reduce((s, g) => s + g.grossWeight, 0).toFixed(2)}g</p></CardContent></Card>
             <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Fine Gold</p><p className="text-base md:text-lg font-bold mt-0.5 text-primary">{goldStock.filter((g) => g.status === 'AVAILABLE').reduce((s, g) => s + g.fineGoldWeight, 0).toFixed(2)}g</p></CardContent></Card>
-            <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Finished Stock Value</p><p className="text-base md:text-lg font-bold mt-0.5">{formatCompact(products.reduce((s, p) => s + p.costPrice * p.stock, 0), settings.currency)}</p></CardContent></Card>
+            <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Finished Stock Value</p><p className="text-base md:text-lg font-bold mt-0.5">{formatCompact(products.reduce((s, p) => s + p.costPrice * p.stock, 0), currency)}</p></CardContent></Card>
             <Card><CardContent className="p-3"><p className="text-[11px] text-muted-foreground">Low Stock Items</p><p className="text-base md:text-lg font-bold mt-0.5 text-amber-600 dark:text-amber-400">{products.filter((p) => p.stock <= 2).length}</p></CardContent></Card>
           </div>
           <Card>
@@ -244,11 +343,11 @@ export function ReportsView() {
             return (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <GstRow label="Taxable Value" value={formatCurrency(taxable, settings.currency)} />
-                  <GstRow label="CGST" value={formatCurrency(cgst, settings.currency)} />
-                  <GstRow label="SGST" value={formatCurrency(sgst, settings.currency)} />
-                  <GstRow label="Total Tax" value={formatCurrency(totalTax, settings.currency)} highlight />
-                  <GstRow label="Grand Total" value={formatCurrency(grandTotal, settings.currency)} />
+                  <GstRow label="Taxable Value" value={formatCurrency(taxable, currency)} />
+                  <GstRow label="CGST" value={formatCurrency(cgst, currency)} />
+                  <GstRow label="SGST" value={formatCurrency(sgst, currency)} />
+                  <GstRow label="Total Tax" value={formatCurrency(totalTax, currency)} highlight />
+                  <GstRow label="Grand Total" value={formatCurrency(grandTotal, currency)} />
                   <GstRow label="Bills Count" value={String(ms.length)} />
                 </div>
                 <Card>
@@ -264,9 +363,9 @@ export function ReportsView() {
                             <tr key={s.id} className="border-b border-border last:border-0">
                               <td className="px-2 py-2 font-medium">{s.invoiceNo}</td>
                               <td className="px-2 py-2 truncate max-w-[150px]">{s.customerName}</td>
-                              <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(s.subtotal, settings.currency)}</td>
-                              <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(s.totalGst, settings.currency)}</td>
-                              <td className="px-2 py-2 text-right tabular-nums font-semibold">{formatCurrency(s.grandTotal, settings.currency)}</td>
+                              <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(s.subtotal, currency)}</td>
+                              <td className="px-2 py-2 text-right tabular-nums">{formatCurrency(s.totalGst, currency)}</td>
+                              <td className="px-2 py-2 text-right tabular-nums font-semibold">{formatCurrency(s.grandTotal, currency)}</td>
                             </tr>
                           ))}
                         </tbody>
