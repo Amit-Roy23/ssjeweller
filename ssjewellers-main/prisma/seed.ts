@@ -150,7 +150,7 @@ async function main() {
     create: {
       id: 'usr-admin',
       username: 'admin',
-      name: 'Suresh Shah (Admin)',
+      name: 'Suresh Shah',
       phone: '+91 98250 12345',
       email: 'admin@ssjewellery.in',
       role: 'ADMIN',

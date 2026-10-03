@@ -103,6 +103,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       },
     })
 
+    // If an Admin user's name was updated, synchronize it to ShopSetting.ownerName
+    if (parsed.data.name && (existingUser.role === 'ADMIN' || existingUser.id === 'usr-admin' || existingUser.username === 'admin')) {
+      await db.shopSetting.upsert({
+        where: { id: 'default' },
+        update: { ownerName: parsed.data.name.trim() },
+        create: { id: 'default', ownerName: parsed.data.name.trim() },
+      })
+    }
+
     await db.auditLog.create({
       data: {
         userId: adminUser.id,

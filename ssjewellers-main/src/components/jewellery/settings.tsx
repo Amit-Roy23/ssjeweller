@@ -67,17 +67,38 @@ export function SettingsView() {
     pan: '',
     defaultGstRate: 3,
     currency: '₹',
-    defaultGoldRate24K: 7200,
-    defaultSilverRate: 85000,
-    invoicePrefix: 'SSJ-',
-    workOrderPrefix: 'WO-',
-    invoiceFooter: 'Thank you for your business!',
-    termsConditions: 'Goods once sold cannot be returned without original receipt.',
+    defaultGoldRate24K: 7250,
+    defaultSilverRate: 94500,
+    invoicePrefix: 'INV-2026',
+    workOrderPrefix: 'WF',
+    invoiceFooter: 'Thank you for your business! Visit again.',
+    termsConditions: '1. Goods once sold will not be taken back.\n2. All disputes subject to Surat jurisdiction.\n3. Gold rate applicable as on date of bill.',
   })
 
   React.useEffect(() => {
     if (settingsData?.settings) {
-      setForm((prev: any) => ({ ...prev, ...settingsData.settings }))
+      const s = settingsData.settings
+      setForm((prev: any) => ({
+        ...prev,
+        ...s,
+        shopName: s.shopName ?? 'S.S. Jewellery',
+        ownerName: s.ownerName ?? '',
+        phone: s.phone ?? '',
+        email: s.email ?? '',
+        address: s.address ?? '',
+        city: s.city ?? '',
+        pincode: s.pincode ?? '',
+        gstin: s.gstin ?? '',
+        pan: s.pan ?? '',
+        currency: s.currency ?? '₹',
+        defaultGoldRate24K: s.defaultGoldRate24K ?? (s.defaultGoldRate24KPaise ? Number(s.defaultGoldRate24KPaise) / 100 : 7250),
+        defaultSilverRate: s.defaultSilverRate ?? (s.defaultSilverRatePaisePerKg ? Number(s.defaultSilverRatePaisePerKg) / 100 : 94500),
+        defaultGstRate: s.defaultGstRate ?? (s.defaultGstRateBps ? Number(s.defaultGstRateBps) / 100 : 3),
+        invoicePrefix: s.invoicePrefix ?? 'INV-2026',
+        workOrderPrefix: s.workOrderPrefix ?? 'WF',
+        invoiceFooter: s.invoiceFooter ?? '',
+        termsConditions: s.termsConditions ?? '',
+      }))
     }
   }, [settingsData])
 
@@ -85,8 +106,13 @@ export function SettingsView() {
 
   const save = async () => {
     try {
-      await updateSettingsMutation.mutateAsync(form)
-      toast.success('Settings saved successfully')
+      await updateSettingsMutation.mutateAsync({
+        ...form,
+        defaultGoldRate24K: Number(form.defaultGoldRate24K) || 0,
+        defaultSilverRate: Number(form.defaultSilverRate) || 0,
+        defaultGstRate: Number(form.defaultGstRate) || 0,
+      })
+      toast.success('Settings and rates saved successfully')
     } catch (err: any) {
       toast.error(err.message || 'Failed to save settings')
     }
@@ -100,9 +126,15 @@ export function SettingsView() {
 
   return (
     <div className="space-y-4 max-w-4xl">
-      <div>
-        <h2 className="text-xl font-bold flex items-center gap-2"><SettingsIcon className="h-5 w-5 text-primary" /> Settings</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">Configure shop, theme, rates, masters &amp; cloud database settings</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2"><SettingsIcon className="h-5 w-5 text-primary" /> Settings</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Configure shop, theme, rates, masters &amp; cloud database settings</p>
+        </div>
+        <Button onClick={save} disabled={updateSettingsMutation.isPending} className="self-start sm:self-auto">
+          {updateSettingsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+          Save Changes
+        </Button>
       </div>
 
       <Tabs defaultValue="company">
@@ -120,7 +152,13 @@ export function SettingsView() {
             <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><Store className="h-4 w-4" /> Shop Information</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Shop Name</Label><Input value={form.shopName ?? ''} onChange={(e) => update({ shopName: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>Owner Name</Label><Input value={form.ownerName ?? ''} onChange={(e) => update({ ownerName: e.target.value })} /></div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5">
+                  Owner / Admin Name
+                  <Badge variant="secondary" className="text-[10px] font-normal py-0">Syncs with Admin</Badge>
+                </Label>
+                <Input value={form.ownerName ?? ''} onChange={(e) => update({ ownerName: e.target.value })} placeholder="Full name of shop owner / admin" />
+              </div>
               <div className="space-y-1.5"><Label>Phone</Label><Input value={form.phone ?? ''} onChange={(e) => update({ phone: e.target.value })} /></div>
               <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email ?? ''} onChange={(e) => update({ email: e.target.value })} /></div>
               <div className="space-y-1.5 sm:col-span-2"><Label>Address</Label><Input value={form.address ?? ''} onChange={(e) => update({ address: e.target.value })} /></div>
@@ -136,14 +174,14 @@ export function SettingsView() {
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>GST Rate (%)</Label><Input type="number" step="0.1" value={form.defaultGstRate ?? 3} onChange={(e) => update({ defaultGstRate: parseFloat(e.target.value) || 0 })} /></div>
               <div className="space-y-1.5"><Label>Currency Symbol</Label><Input value={form.currency ?? '₹'} onChange={(e) => update({ currency: e.target.value })} maxLength={2} /></div>
-              <div className="space-y-1.5"><Label className="flex items-center gap-1"><Gem className="h-3 w-3" /> Gold Rate 24K (₹/g)</Label><Input type="number" value={form.defaultGoldRate24K ?? 7200} onChange={(e) => update({ defaultGoldRate24K: parseFloat(e.target.value) || 0 })} /></div>
-              <div className="space-y-1.5"><Label>Silver Rate (₹/kg)</Label><Input type="number" value={form.defaultSilverRate ?? 85000} onChange={(e) => update({ defaultSilverRate: parseFloat(e.target.value) || 0 })} /></div>
-              <div className="space-y-1.5"><Label>Invoice Prefix</Label><Input value={form.invoicePrefix ?? 'SSJ-'} onChange={(e) => update({ invoicePrefix: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>Work Order Prefix</Label><Input value={form.workOrderPrefix ?? 'WO-'} onChange={(e) => update({ workOrderPrefix: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label className="flex items-center gap-1"><Gem className="h-3 w-3" /> Gold Rate 24K (₹/g)</Label><Input type="number" value={form.defaultGoldRate24K ?? 7250} onChange={(e) => update({ defaultGoldRate24K: parseFloat(e.target.value) || 0 })} /></div>
+              <div className="space-y-1.5"><Label>Silver Rate (₹/kg)</Label><Input type="number" value={form.defaultSilverRate ?? 94500} onChange={(e) => update({ defaultSilverRate: parseFloat(e.target.value) || 0 })} /></div>
+              <div className="space-y-1.5"><Label>Invoice Prefix</Label><Input value={form.invoicePrefix ?? 'INV-2026'} onChange={(e) => update({ invoicePrefix: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Work Order Prefix</Label><Input value={form.workOrderPrefix ?? 'WF'} onChange={(e) => update({ workOrderPrefix: e.target.value })} /></div>
               <div className="space-y-1.5 sm:col-span-2"><Label>Invoice Footer</Label><Input value={form.invoiceFooter ?? ''} onChange={(e) => update({ invoiceFooter: e.target.value })} /></div>
               <div className="space-y-1.5 sm:col-span-2"><Label>Terms &amp; Conditions</Label><Input value={form.termsConditions ?? ''} onChange={(e) => update({ termsConditions: e.target.value })} /></div>
             </CardContent>
-            <CardFooter className="justify-end pt-3">
+            <CardFooter className="justify-end pt-3 border-t">
               <Button onClick={save} disabled={updateSettingsMutation.isPending}>
                 {updateSettingsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
                 Save Changes

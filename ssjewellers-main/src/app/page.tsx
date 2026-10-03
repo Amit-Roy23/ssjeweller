@@ -262,11 +262,21 @@ function AppShell() {
   }, [authData, setCurrentUser])
 
   // Fallback defaults for settings
-  const settings = settingsData?.settings || {
-    shopName: 'S.S Jewellery',
-    city: 'Kolkata',
-    defaultGoldRate24K: 7250,
-  }
+  const sData = settingsData?.settings
+  const settings = sData
+    ? {
+        ...sData,
+        shopName: sData.shopName || 'S.S JEWELLERY',
+        city: sData.city || 'Surat',
+        defaultGoldRate24K:
+          sData.defaultGoldRate24K ??
+          (sData.defaultGoldRate24KPaise ? Number(sData.defaultGoldRate24KPaise) / 100 : 7250),
+      }
+    : {
+        shopName: 'S.S JEWELLERY',
+        city: 'Surat',
+        defaultGoldRate24K: 7250,
+      }
 
   const notifications = notificationsData?.notifications || []
 

@@ -156,7 +156,7 @@ async function main() {
   const defaultPassword = process.env.DEMO_USER_PASSWORD || process.env.PW_ADMIN || 'SecureInitialAuth@2026'
   const defaultHash = await bcrypt.hash(defaultPassword, 10)
   const users = [
-    { id: 'usr-admin', username: 'admin', name: 'Suresh Shah (Admin)', phone: '+91 98250 12345', email: 'admin@ssjewellery.in', role: UserRole.ADMIN, passwordHash: defaultHash, active: true, createdAt: daysAgo(365), lastLogin: hoursAgo(2) },
+    { id: 'usr-admin', username: 'admin', name: 'Suresh Shah', phone: '+91 98250 12345', email: 'admin@ssjewellery.in', role: UserRole.ADMIN, passwordHash: defaultHash, active: true, createdAt: daysAgo(365), lastLogin: hoursAgo(2) },
     { id: 'usr-manager', username: 'manager', name: 'Priya Mehta (Manager)', phone: '+91 98250 77882', email: 'priya@ssjewellery.in', role: UserRole.MANAGER, passwordHash: defaultHash, active: true, createdAt: daysAgo(200), lastLogin: hoursAgo(1) },
     { id: 'usr-rahul', username: 'rahul', name: 'Rahul Kumar', phone: '+91 98240 11223', role: UserRole.STAFF, passwordHash: defaultHash, active: true, specialty: 'Gold Issue & Melting', createdAt: daysAgo(180), lastLogin: hoursAgo(5) },
     { id: 'usr-amit', username: 'amit', name: 'Amit Patel', phone: '+91 99240 22118', role: UserRole.STAFF, passwordHash: defaultHash, active: true, specialty: 'Shaping', createdAt: daysAgo(160), lastLogin: hoursAgo(3) },
@@ -910,7 +910,7 @@ async function main() {
       priority: WorkPriority.HIGH,
       status: WorkStatusValue.APPROVED,
       assignedToId: 'usr-admin',
-      assignedToName: 'Suresh Shah (Admin)',
+      assignedToName: 'Suresh Shah',
       startDate: daysAgo(15),
       expectedCompletion: daysAgo(6),
       actualCompletion: daysAgo(6),
@@ -922,7 +922,7 @@ async function main() {
         { stepId: 'ws-b4', stepName: 'Design & Cutting', assignedToId: 'usr-sumit', assignedToName: 'Sumit Verma', status: WorkStatusValue.COMPLETED, inputWeightMg: gramsToMg(62.0), outputWeightMg: gramsToMg(61.6), order: 3, startedAt: daysAgo(12), completedAt: daysAgo(10), dueDate: daysAgo(10) },
         { stepId: 'ws-b5', stepName: 'Polishing', assignedToId: 'usr-rakesh', assignedToName: 'Rakesh Singh', status: WorkStatusValue.COMPLETED, inputWeightMg: gramsToMg(61.6), outputWeightMg: gramsToMg(61.4), order: 4, startedAt: daysAgo(10), completedAt: daysAgo(8), dueDate: daysAgo(8) },
         { stepId: 'ws-b6', stepName: 'Finishing', assignedToId: 'usr-rahul', assignedToName: 'Rahul Kumar', status: WorkStatusValue.COMPLETED, inputWeightMg: gramsToMg(61.4), outputWeightMg: gramsToMg(61.2), order: 5, startedAt: daysAgo(8), completedAt: daysAgo(6), dueDate: daysAgo(6) },
-        { stepId: 'ws-b7', stepName: 'Quality Check', assignedToId: 'usr-admin', assignedToName: 'Suresh Shah (Admin)', status: WorkStatusValue.APPROVED, order: 6, startedAt: daysAgo(6), completedAt: daysAgo(6), dueDate: daysAgo(6) },
+        { stepId: 'ws-b7', stepName: 'Quality Check', assignedToId: 'usr-admin', assignedToName: 'Suresh Shah', status: WorkStatusValue.APPROVED, order: 6, startedAt: daysAgo(6), completedAt: daysAgo(6), dueDate: daysAgo(6) },
       ],
     },
   ]
@@ -977,10 +977,10 @@ async function main() {
 
   // 19. Audit Logs & Notifications
   const auditLogs = [
-    { id: 'al-1', timestamp: daysAgo(30), userId: 'usr-admin', userName: 'Suresh Shah (Admin)', action: 'CREATE_PURCHASE', entity: 'Purchase', entityId: 'PUR-2026-0001', details: 'Created purchase from Royal Gold Suppliers (₹710,000)' },
-    { id: 'al-2', timestamp: daysAgo(15), userId: 'usr-admin', userName: 'Suresh Shah (Admin)', action: 'CREATE_SALE', entity: 'Sale', entityId: 'INV-2026-00121', details: 'Created invoice for Priya Patel (₹43,260)' },
-    { id: 'al-3', timestamp: daysAgo(3), userId: 'usr-admin', userName: 'Suresh Shah (Admin)', action: 'CREATE_WORK_ORDER', entity: 'WorkOrder', entityId: 'WF-10025', details: 'Created work order for Gold Ring' },
-    { id: 'al-6', timestamp: hoursAgo(2), userId: 'usr-admin', userName: 'Suresh Shah (Admin)', action: 'LOGIN', entity: 'User', entityId: 'usr-admin', details: 'Admin logged in' },
+    { id: 'al-1', timestamp: daysAgo(30), userId: 'usr-admin', userName: 'Suresh Shah', action: 'CREATE_PURCHASE', entity: 'Purchase', entityId: 'PUR-2026-0001', details: 'Created purchase from Royal Gold Suppliers (₹710,000)' },
+    { id: 'al-2', timestamp: daysAgo(15), userId: 'usr-admin', userName: 'Suresh Shah', action: 'CREATE_SALE', entity: 'Sale', entityId: 'INV-2026-00121', details: 'Created invoice for Priya Patel (₹43,260)' },
+    { id: 'al-3', timestamp: daysAgo(3), userId: 'usr-admin', userName: 'Suresh Shah', action: 'CREATE_WORK_ORDER', entity: 'WorkOrder', entityId: 'WF-10025', details: 'Created work order for Gold Ring' },
+    { id: 'al-6', timestamp: hoursAgo(2), userId: 'usr-admin', userName: 'Suresh Shah', action: 'LOGIN', entity: 'User', entityId: 'usr-admin', details: 'Admin logged in' },
   ]
   for (const al of auditLogs) {
     await prisma.auditLog.upsert({
